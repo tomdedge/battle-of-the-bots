@@ -3,18 +3,18 @@ import { IconMessageCircle, IconCalendar, IconChecklist, IconBrain } from '@tabl
 
 export function BottomTabs({ activeTab, setActiveTab }) {
   return (
-    <Tabs value={activeTab} onChange={setActiveTab} variant="pills" radius="md">
+    <Tabs value={activeTab} onChange={setActiveTab} variant="pills" radius="md" data-testid="bottom-tabs">
       <Tabs.List grow style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: 'var(--mantine-color-body)', borderTop: '1px solid var(--mantine-color-gray-3)', padding: '8px' }}>
-        <Tabs.Tab value="chat" leftSection={<IconMessageCircle size={16} />}>
+        <Tabs.Tab value="chat" leftSection={<IconMessageCircle size={16} />} data-testid="chat-tab">
           <Center>Chat</Center>
         </Tabs.Tab>
-        <Tabs.Tab value="calendar" leftSection={<IconCalendar size={16} />}>
+        <Tabs.Tab value="calendar" leftSection={<IconCalendar size={16} />} data-testid="calendar-tab">
           <Center>Calendar</Center>
         </Tabs.Tab>
-        <Tabs.Tab value="tasks" leftSection={<IconChecklist size={16} />}>
+        <Tabs.Tab value="tasks" leftSection={<IconChecklist size={16} />} data-testid="tasks-tab">
           <Center>Tasks</Center>
         </Tabs.Tab>
-        <Tabs.Tab value="meditation" leftSection={<IconBrain size={16} />}>
+        <Tabs.Tab value="meditation" leftSection={<IconBrain size={16} />} data-testid="meditation-tab">
           <Center>Meditation</Center>
         </Tabs.Tab>
       </Tabs.List>

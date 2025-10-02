@@ -7,7 +7,7 @@ import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Header } from './components/Navigation/Header';
 import { BottomTabs } from './components/Navigation/BottomTabs';
 import { ChatInterface } from './components/Chat/ChatInterface';
-import { CalendarPlaceholder } from './components/Calendar/CalendarPlaceholder';
+import { CalendarView } from './components/Calendar/CalendarView';
 import { TasksPlaceholder } from './components/Tasks/TasksPlaceholder';
 import { MeditationPlaceholder } from './components/Meditation/MeditationPlaceholder';
 import '@mantine/core/styles.css';
@@ -25,7 +25,7 @@ function App() {
       case 'chat':
         return <ChatInterface />;
       case 'calendar':
-        return <CalendarPlaceholder />;
+        return <CalendarView />;
       case 'tasks':
         return <TasksPlaceholder />;
       case 'meditation':

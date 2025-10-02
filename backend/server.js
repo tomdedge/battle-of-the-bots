@@ -17,6 +17,7 @@ const aiService = require('./services/aiService');
 const dbService = require('./services/dbService');
 const { authenticateSocket } = require('./middleware/socketAuth');
 const authRoutes = require('./routes/auth');
+const calendarRoutes = require('./routes/calendar');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +32,7 @@ app.use(passport.initialize());
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -117,6 +119,34 @@ io.on('connection', async (socket) => {
       });
     } catch (error) {
       console.error('Failed to update model preference:', error);
+    }
+  });
+
+  // Calendar events
+  socket.on('calendar_sync_request', async () => {
+    try {
+      const calendarService = require('./services/calendarService');
+      const today = new Date().toISOString().split('T')[0];
+      const gaps = await calendarService.analyzeCalendarGaps(socket.user.userId, new Date());
+      const suggestions = gaps.map(gap => calendarService.suggestFocusBlock(gap));
+      
+      socket.emit('calendar_suggestions', {
+        gaps,
+        suggestions,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      socket.emit('calendar_error', { error: error.message });
+    }
+  });
+
+  socket.on('focus_block_approved', async (data) => {
+    try {
+      const calendarService = require('./services/calendarService');
+      const event = await calendarService.createEvent(socket.user.userId, data.focusBlock);
+      socket.emit('focus_block_created', { event, timestamp: new Date().toISOString() });
+    } catch (error) {
+      socket.emit('calendar_error', { error: error.message });
     }
   });
 
