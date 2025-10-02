@@ -12,6 +12,14 @@ class CalendarService {
 
   async getAuthenticatedClient(userId) {
     const user = await dbService.getUserById(userId);
+    console.log('User data for calendar auth:', {
+      userId,
+      hasUser: !!user,
+      hasAccessToken: !!(user?.access_token),
+      hasRefreshToken: !!(user?.refresh_token),
+      accessTokenLength: user?.access_token?.length || 0
+    });
+    
     if (!user || !user.access_token) {
       throw new Error('User not authenticated');
     }
@@ -20,6 +28,21 @@ class CalendarService {
       access_token: user.access_token,
       refresh_token: user.refresh_token
     });
+
+    // Try to refresh the token if it's expired
+    try {
+      const { credentials } = await this.oauth2Client.refreshAccessToken();
+      if (credentials.access_token !== user.access_token) {
+        // Update the database with new tokens
+        await dbService.updateUserTokens(userId, {
+          access_token: credentials.access_token,
+          refresh_token: credentials.refresh_token || user.refresh_token
+        });
+        console.log('Refreshed access token for user:', userId);
+      }
+    } catch (refreshError) {
+      console.log('Token refresh failed (may not be expired):', refreshError.message);
+    }
     
     return google.calendar({ version: 'v3', auth: this.oauth2Client });
   }

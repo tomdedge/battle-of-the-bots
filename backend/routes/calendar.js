@@ -8,10 +8,22 @@ router.use(authenticateToken);
 
 router.get('/events', async (req, res) => {
   try {
+    console.log('Calendar events request:', {
+      userId: req.user.userId,
+      query: req.query
+    });
+    
     const { start, end } = req.query;
     const events = await calendarService.getEvents(req.user.userId, start, end);
+    
+    console.log(`Retrieved ${events.length} events for user ${req.user.userId}`);
     res.json({ events });
   } catch (error) {
+    console.error('Calendar events error:', {
+      userId: req.user.userId,
+      error: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ error: error.message });
   }
 });

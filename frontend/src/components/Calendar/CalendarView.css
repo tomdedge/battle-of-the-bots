@@ -6,6 +6,11 @@
   --rbc-today-bg-color: var(--mantine-color-aura-0);
 }
 
+/* Hide the default toolbar */
+.rbc-toolbar {
+  display: none !important;
+}
+
 /* Suggestion events styling */
 .rbc-event.suggestion-event {
   background-color: var(--mantine-color-aura-1) !important;
@@ -41,4 +46,114 @@
 
 .rbc-today {
   background-color: var(--mantine-color-aura-0);
+}
+
+/* Make calendar fill available space */
+.rbc-calendar {
+  height: 100% !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.rbc-month-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.rbc-month-row {
+  flex: 1;
+  min-height: 0;
+}
+/* Fix DatePicker navigation */
+.mantine-DatePicker-calendarHeader {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.mantine-DatePicker-calendarHeaderControl {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.mantine-DatePicker-calendarHeaderControl[data-direction="previous"] svg {
+  transform: rotate(90deg) !important;
+}
+
+.mantine-DatePicker-calendarHeaderControl[data-direction="next"] svg {
+  transform: rotate(-90deg) !important;
+}
+
+/* Gray out outside dates */
+.mantine-DatePicker-day[data-outside] {
+  color: var(--mantine-color-gray-5) !important;
+}
+
+/* Spread dates across modal width using table layout */
+.mantine-DatePicker-month {
+  width: 100% !important;
+}
+
+.mantine-DatePicker-month table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.mantine-DatePicker-month th {
+  width: 14.28% !important;
+  text-align: right !important;
+}
+
+.mantine-DatePicker-month td {
+  width: 14.28% !important;
+  text-align: right !important;
+}
+
+.mantine-DatePicker-day {
+  width: 100% !important;
+  text-align: right !important;
+  justify-content: flex-end !important;
+}
+
+/* Week view day headers */
+.rbc-header {
+  white-space: pre-line !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  padding: 12px 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  z-index: 10 !important;
+  background: var(--mantine-color-body) !important;
+}
+
+.rbc-row-bg {
+  z-index: 1 !important;
+}
+
+.rbc-day-bg {
+  z-index: 1 !important;
+}
+
+/* Fix column alignment in week view */
+.rbc-allday-cell,
+.rbc-header,
+.rbc-time-header-gutter {
+  box-sizing: border-box !important;
+}
+
+.rbc-allday-cell {
+  border-right: 1px solid var(--rbc-border-color) !important;
+}
+
+.rbc-allday-cell:last-child {
+  border-right: none !important;
+}
+
+.rbc-time-content > .rbc-time-gutter,
+.rbc-time-content > .rbc-time-column {
+  box-sizing: border-box !important;
 }

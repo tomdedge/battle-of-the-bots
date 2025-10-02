@@ -13,6 +13,8 @@ class GoogleAuthService {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: process.env.GOOGLE_REDIRECT_URI,
+      accessType: 'offline',
+      prompt: 'consent',
       scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/tasks']
     }, this.handleGoogleCallback.bind(this)));
   }
