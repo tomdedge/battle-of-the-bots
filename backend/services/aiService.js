@@ -5,10 +5,16 @@ class AIService {
   constructor() {
     this.baseURL = process.env.LLM_BASE_URL;
     this.apiKey = process.env.LLM_API_KEY;
+    this.cachedModels = null;
+    this.defaultModel = null;
     console.log('AIService initialized with:', { baseURL: this.baseURL, apiKey: this.apiKey ? 'SET' : 'NOT SET' });
   }
 
   async getModels() {
+    if (this.cachedModels) {
+      return this.cachedModels;
+    }
+    
     console.log('Fetching models from:', `${this.baseURL}/v1/models`);
     const response = await fetch(`${this.baseURL}/v1/models`, {
       method: "GET",
@@ -19,10 +25,34 @@ class AIService {
       // Accept self-signed certificates for internal services
       agent: process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
     });
-    return response.json();
+    
+    const result = await response.json();
+    this.cachedModels = result;
+    
+    // Cache the first available model as default
+    if (result.data && result.data.length > 0) {
+      this.defaultModel = result.data[0].id;
+    }
+    
+    return result;
   }
 
-  async sendMessage(message, model = 'gpt-4o-mini', userId = null, sessionId = null) {
+  getDefaultModel() {
+    return this.defaultModel;
+  }
+
+  async sendMessage(message, model, userId = null, sessionId = null) {
+    if (!model) {
+      model = this.getDefaultModel();
+      if (!model) {
+        // Try to get models if we don't have a cached default
+        await this.getModels();
+        model = this.getDefaultModel();
+        if (!model) {
+          throw new Error('No models available');
+        }
+      }
+    }
     try {
       // Get user context for personalized system prompt
       let systemContent = 'You are AuraFlow, a mindful productivity assistant. Keep responses concise and helpful.';
@@ -137,6 +167,17 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
       });
 
       const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('API error response:', data);
+        throw new Error(`API error: ${data.error?.message || response.statusText}`);
+      }
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error('Unexpected API response structure:', data);
+        throw new Error('Invalid API response structure');
+      }
+      
       const aiMessage = data.choices[0].message;
 
       let finalResponse = aiMessage.content;
@@ -191,6 +232,17 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         });
 
         const followUpData = await followUpResponse.json();
+        
+        if (!followUpResponse.ok) {
+          console.error('Follow-up API error response:', followUpData);
+          throw new Error(`Follow-up API error: ${followUpData.error?.message || followUpResponse.statusText}`);
+        }
+        
+        if (!followUpData.choices || !followUpData.choices[0] || !followUpData.choices[0].message) {
+          console.error('Unexpected follow-up API response structure:', followUpData);
+          throw new Error('Invalid follow-up API response structure');
+        }
+        
         finalResponse = followUpData.choices[0].message.content;
       }
 

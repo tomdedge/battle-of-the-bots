@@ -8,7 +8,7 @@ export const useSocket = () => {
   const { token, isAuthenticated, user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [models, setModels] = useState([]);
-  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
+  const [selectedModel, setSelectedModel] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export const useSocket = () => {
       
       const onModels = ({ models, initialModel, user: serverUser }) => {
         setModels(models || []);
-        setSelectedModel(initialModel || 'gpt-4o-mini');
+        setSelectedModel(initialModel);
       };
 
       const onChatHistory = (history) => {

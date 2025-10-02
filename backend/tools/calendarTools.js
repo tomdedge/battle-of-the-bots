@@ -102,35 +102,12 @@ class CalendarTools {
 
   static async updateEvent(args) {
     const { userId, eventId, ...updateData } = args;
-    
-    const calendar = await calendarService.getAuthenticatedClient(userId);
-    const eventData = {};
-    
-    if (updateData.title) eventData.summary = updateData.title;
-    if (updateData.description) eventData.description = updateData.description;
-    if (updateData.location) eventData.location = updateData.location;
-    if (updateData.startDateTime) eventData.start = { dateTime: updateData.startDateTime };
-    if (updateData.endDateTime) eventData.end = { dateTime: updateData.endDateTime };
-
-    const response = await calendar.events.update({
-      calendarId: 'primary',
-      eventId,
-      resource: eventData
-    });
-    
-    return response.data;
+    return await calendarService.updateEvent(userId, eventId, updateData);
   }
 
   static async deleteEvent(args) {
     const { userId, eventId } = args;
-    
-    const calendar = await calendarService.getAuthenticatedClient(userId);
-    await calendar.events.delete({
-      calendarId: 'primary',
-      eventId
-    });
-    
-    return { success: true, eventId };
+    return await calendarService.deleteEvent(userId, eventId);
   }
 }
 

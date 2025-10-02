@@ -1,5 +1,6 @@
 import { Paper, Text, Box, Avatar, Group, Menu, ActionIcon } from '@mantine/core';
 import { IconDots, IconTrash, IconRefresh } from '@tabler/icons-react';
+import ReactMarkdown from 'react-markdown';
 
 export const MessageBubble = ({ message, isUser, timestamp, error, user, messageId, onDelete, onRegenerate }) => {
   const getUserInitials = (name) => {
@@ -28,7 +29,6 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
         )}
         
         <Paper
-          p="sm"
           style={{
             maxWidth: '80%',
             backgroundColor: isUser 
@@ -39,10 +39,10 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
             color: isUser ? 'white' : 'var(--mantine-color-text)',
             order: isUser ? 1 : 2,
             position: 'relative',
-            paddingRight: messageId && (onDelete || onRegenerate) ? '32px' : undefined
+            padding: messageId && (onDelete || onRegenerate) ? '12px 32px 12px 12px' : '12px'
           }}
         >
-          <Text size="sm">{message}</Text>
+          <ReactMarkdown>{message}</ReactMarkdown>
           {timestamp && (
             <Text size="xs" c={isUser ? "rgba(255,255,255,0.7)" : "dimmed"} mt={4}>
               {new Date(timestamp).toLocaleTimeString()}
