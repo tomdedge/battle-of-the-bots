@@ -1,32 +1,32 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Tasks Integration', () => {
+  test.beforeEach(async ({ page }) => {
+    // Set mock token for authenticated tests
+    await page.addInitScript(() => {
+      localStorage.setItem('authToken', 'mock-jwt-token');
+    });
+  });
+
   test('should show tasks tab in navigation', async ({ page }) => {
     await page.goto('/');
+    await page.waitForTimeout(1000);
     
-    // Check if we can see the tasks tab (either authenticated or not)
-    const hasTasksTab = await page.locator('[data-testid="tasks-tab"]').isVisible();
-    const hasSignIn = await page.locator('text=Sign in with Google').isVisible();
+    // Check if we can see the tasks tab
+    const hasTasksTab = await page.getByRole('tab', { name: 'Tasks' }).isVisible();
     
-    // Should show either the tasks tab or sign in
-    expect(hasTasksTab || hasSignIn).toBe(true);
+    // Should show the tasks tab when authenticated
+    expect(hasTasksTab).toBe(true);
   });
 
   test('should navigate to tasks tab when clicked', async ({ page }) => {
     await page.goto('/');
+    await page.waitForTimeout(1000);
     
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    // Click tasks tab
+    await page.getByRole('tab', { name: 'Tasks' }).click();
     
-    // If tasks tab is visible, click it
-    const tasksTab = page.locator('[data-testid="tasks-tab"]');
-    if (await tasksTab.isVisible()) {
-      await tasksTab.click();
-      // Should not throw an error
-      expect(true).toBe(true);
-    } else {
-      // If not authenticated, that's expected
-      expect(await page.locator('text=Sign in with Google').isVisible()).toBe(true);
-    }
+    // Should show tasks interface (Add Task button)
+    await expect(page.getByText('Add Task')).toBeVisible();
   });
 });
