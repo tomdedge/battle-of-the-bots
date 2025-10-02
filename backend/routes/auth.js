@@ -44,6 +44,29 @@ router.get('/chat/history', authenticateToken, async (req, res) => {
   }
 });
 
+// Clear all chat history
+router.delete('/chat/history', authenticateToken, async (req, res) => {
+  try {
+    await dbService.clearChatHistory(req.user.userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Clear chat history error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete individual chat message
+router.delete('/chat/message/:messageId', authenticateToken, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    await dbService.deleteChatMessage(req.user.userId, messageId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete chat message error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Logout endpoint
 router.post('/logout', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
