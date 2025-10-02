@@ -10,6 +10,16 @@ class CalendarService {
     );
   }
 
+  suggestFocusBlock(gap, taskContext = '') {
+    return {
+      title: `Focus Block - ${Math.floor(gap.duration)} min`,
+      start: { dateTime: gap.start.toISOString() },
+      end: { dateTime: gap.end.toISOString() },
+      description: `Suggested focus time${taskContext ? `. Context: ${taskContext}` : ''}`,
+      colorId: '2'
+    };
+  }
+
   async getAuthenticatedClient(userId) {
     const user = await dbService.getUserById(userId);
     console.log('User data for calendar auth:', {
@@ -119,14 +129,33 @@ class CalendarService {
     return gaps;
   }
 
-  suggestFocusBlock(gap, taskContext = '') {
-    return {
-      title: `Focus Block - ${Math.floor(gap.duration)} min`,
-      start: { dateTime: gap.start.toISOString() },
-      end: { dateTime: gap.end.toISOString() },
-      description: `Suggested focus time${taskContext ? `. Context: ${taskContext}` : ''}`,
-      colorId: '2'
-    };
+  async updateEvent(userId, eventId, updateData) {
+    const calendar = await this.getAuthenticatedClient(userId);
+    const eventData = {};
+    
+    if (updateData.title) eventData.summary = updateData.title;
+    if (updateData.description) eventData.description = updateData.description;
+    if (updateData.location) eventData.location = updateData.location;
+    if (updateData.startDateTime) eventData.start = { dateTime: updateData.startDateTime };
+    if (updateData.endDateTime) eventData.end = { dateTime: updateData.endDateTime };
+
+    const response = await calendar.events.update({
+      calendarId: 'primary',
+      eventId,
+      resource: eventData
+    });
+    
+    return response.data;
+  }
+
+  async deleteEvent(userId, eventId) {
+    const calendar = await this.getAuthenticatedClient(userId);
+    await calendar.events.delete({
+      calendarId: 'primary',
+      eventId
+    });
+    
+    return { success: true, eventId };
   }
 }
 
