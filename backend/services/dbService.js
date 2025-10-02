@@ -86,6 +86,18 @@ class DatabaseService {
     const result = await this.pool.query(query, values);
     return result.rows[0];
   }
+
+  async updateUserTokens(userId, tokens) {
+    const query = `
+      UPDATE users 
+      SET access_token = $2, refresh_token = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `;
+    const values = [userId, tokens.access_token, tokens.refresh_token];
+    const result = await this.pool.query(query, values);
+    return result.rows[0];
+  }
 }
 
 module.exports = new DatabaseService();
