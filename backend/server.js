@@ -3,7 +3,39 @@ const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
 const passport = require('passport');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+// Run migrations on startup
+async function runMigrations() {
+  const { Pool } = require('pg');
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+
+  const migrationsDir = path.join(__dirname, 'migrations');
+  if (fs.existsSync(migrationsDir)) {
+    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+    
+    for (const file of files) {
+      try {
+        const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+        await pool.query(sql);
+        console.log(`✓ Migration ${file} applied`);
+      } catch (error) {
+        console.log(`- Migration ${file} skipped (likely already applied)`);
+      }
+    }
+  }
+  await pool.end();
+}
+
+// Run migrations before starting server
+runMigrations().then(() => {
+  console.log('Database migrations completed');
+}).catch(console.error);
 
 console.log('Environment variables loaded:');
 console.log('LLM_BASE_URL:', process.env.LLM_BASE_URL);
@@ -19,6 +51,7 @@ const { authenticateSocket } = require('./middleware/socketAuth');
 const authRoutes = require('./routes/auth');
 const calendarRoutes = require('./routes/calendar');
 const tasksRoutes = require('./routes/tasks');
+const toolsRoutes = require('./routes/tools');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,11 +63,13 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 app.use(passport.initialize());
+app.use('/avatars', express.static(path.join(__dirname, 'public/avatars')));
 
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/tools', toolsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

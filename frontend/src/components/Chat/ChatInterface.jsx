@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Stack, ScrollArea, Text, Loader, Center, Select } from '@mantine/core';
+import { Stack, ScrollArea, Text, Loader, Center } from '@mantine/core';
 import { useSocket } from '../../hooks/useSocket';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
@@ -71,7 +71,7 @@ export const ChatInterface = () => {
           </Center>
         ) : (
           messages.map((msg) => (
-            <MessageBubble key={msg.id} {...msg} />
+            <MessageBubble key={msg.id} {...msg} user={user} />
           ))
         )}
         {isLoading && (
@@ -88,14 +88,6 @@ export const ChatInterface = () => {
         <ChatInput 
           onSendMessage={handleSendMessage}
           disabled={!isConnected || isLoading}
-        />
-        <Select
-          label="Model"
-          placeholder="Select model"
-          data={models.map(m => ({ value: m.id, label: m.id }))}
-          value={selectedModel}
-          onChange={setSelectedModel}
-          size="xs"
         />
       </Stack>
     </Stack>

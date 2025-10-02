@@ -102,20 +102,16 @@ export const CalendarView = () => {
   const eventStyleGetter = (event) => {
     if (event.type === 'suggestion') {
       return {
-        style: {
-          backgroundColor: 'var(--mantine-color-aura-1)',
-          border: '2px dashed var(--mantine-color-aura-2)',
-          opacity: 0.7,
-          color: 'white'
-        }
+        backgroundColor: 'var(--mantine-color-aura-1)',
+        border: '2px dashed var(--mantine-color-aura-2)',
+        opacity: 0.7,
+        color: 'white'
       };
     }
     return {
-      style: {
-        backgroundColor: 'var(--mantine-color-blue-6)',
-        border: '1px solid var(--mantine-color-blue-7)',
-        color: 'white'
-      }
+      backgroundColor: 'var(--mantine-color-blue-6)',
+      border: '1px solid var(--mantine-color-blue-7)',
+      color: 'white'
     };
   };
 
@@ -156,6 +152,7 @@ export const CalendarView = () => {
           onSelectEvent={handleEventClick}
           eventPropGetter={eventStyleGetter}
           style={{ height: '100%' }}
+          components={{}}
         />
       </Paper>
     </Stack>

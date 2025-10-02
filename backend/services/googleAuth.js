@@ -34,7 +34,8 @@ class GoogleAuthService {
         userId: user.id, // Use database ID, not Google ID
         googleId: user.google_id,
         email: user.email,
-        name: user.name 
+        name: user.name,
+        picture: user.picture
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }

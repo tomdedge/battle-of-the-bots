@@ -34,7 +34,8 @@ export const AuthProvider = ({ children }) => {
           id: 'test-user-123',
           googleId: 'test-google-id',
           email: 'test@example.com',
-          name: 'Test User'
+          name: 'Test User',
+          picture: null
         });
       } else {
         // Decode real JWT to get user info
@@ -44,7 +45,8 @@ export const AuthProvider = ({ children }) => {
             id: payload.userId,
             googleId: payload.googleId,
             email: payload.email,
-            name: payload.name
+            name: payload.name,
+            picture: payload.picture
           });
         } catch (error) {
           console.error('Invalid token:', error);
