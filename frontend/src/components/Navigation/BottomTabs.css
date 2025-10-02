@@ -1,0 +1,20 @@
+/* Hide tab labels on narrow screens */
+@media (max-width: 480px) {
+  .tab-label {
+    display: none !important;
+  }
+  
+  /* Center and enlarge icons when labels are hidden */
+  .mantine-Tabs-tab {
+    justify-content: center !important;
+  }
+  
+  .mantine-Tabs-tabSection {
+    margin-right: 0 !important;
+  }
+  
+  .mantine-Tabs-tabSection svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+}
