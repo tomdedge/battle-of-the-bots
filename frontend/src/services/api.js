@@ -39,6 +39,41 @@ class ApiService {
       body: JSON.stringify(focusBlockData),
     });
   }
+
+  // Tasks methods
+  async getTaskLists() {
+    return this.request('/api/tasks/lists');
+  }
+
+  async getTasks(listId = '@default') {
+    return this.request(`/api/tasks?listId=${listId}`);
+  }
+
+  async createTask(taskData, listId = '@default') {
+    return this.request(`/api/tasks?listId=${listId}`, {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async updateTask(taskId, taskData, listId = '@default') {
+    return this.request(`/api/tasks/${taskId}?listId=${listId}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData),
+    });
+  }
+
+  async deleteTask(taskId, listId = '@default') {
+    return this.request(`/api/tasks/${taskId}?listId=${listId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async completeTask(taskId, listId = '@default') {
+    return this.request(`/api/tasks/${taskId}/complete?listId=${listId}`, {
+      method: 'POST',
+    });
+  }
 }
 
 export default ApiService;

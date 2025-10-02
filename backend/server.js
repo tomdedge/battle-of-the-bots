@@ -18,6 +18,7 @@ const dbService = require('./services/dbService');
 const { authenticateSocket } = require('./middleware/socketAuth');
 const authRoutes = require('./routes/auth');
 const calendarRoutes = require('./routes/calendar');
+const tasksRoutes = require('./routes/tasks');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +34,7 @@ app.use(passport.initialize());
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/tasks', tasksRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

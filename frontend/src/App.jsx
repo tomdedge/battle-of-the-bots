@@ -8,10 +8,11 @@ import { Header } from './components/Navigation/Header';
 import { BottomTabs } from './components/Navigation/BottomTabs';
 import { ChatInterface } from './components/Chat/ChatInterface';
 import { CalendarView } from './components/Calendar/CalendarView';
-import { TasksPlaceholder } from './components/Tasks/TasksPlaceholder';
+import { TasksView } from './components/Tasks/TasksView';
 import { MeditationPlaceholder } from './components/Meditation/MeditationPlaceholder';
 import { InstallPrompt } from './components/InstallPrompt';
 import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState('chat');
@@ -28,7 +29,7 @@ function App() {
       case 'calendar':
         return <CalendarView />;
       case 'tasks':
-        return <TasksPlaceholder />;
+        return <TasksView />;
       case 'meditation':
         return <MeditationPlaceholder />;
       default:
