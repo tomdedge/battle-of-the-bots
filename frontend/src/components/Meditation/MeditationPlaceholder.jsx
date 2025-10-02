@@ -1,5 +1,5 @@
-import { BoxBreathing } from './BoxBreathing';
+import { BoxBreathingCanvas } from './BoxBreathingCanvas';
 
 export function MeditationPlaceholder() {
-  return <BoxBreathing />;
+  return <BoxBreathingCanvas />;
 }
