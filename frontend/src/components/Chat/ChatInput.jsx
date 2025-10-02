@@ -1,9 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TextInput, ActionIcon, Group } from '@mantine/core';
-import { IconSend } from '@tabler/icons-react';
+import { IconSend, IconMicrophone, IconMicrophoneOff } from '@tabler/icons-react';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 
 export const ChatInput = ({ onSendMessage, disabled }) => {
   const [message, setMessage] = useState('');
+  const { isListening, transcript, isSupported, startListening, stopListening } = useSpeechRecognition((finalText) => {
+    console.log('ChatInput onComplete called with:', finalText);
+    console.log('disabled:', disabled);
+    if (finalText) {
+      console.log('Calling onSendMessage with:', finalText);
+      onSendMessage(finalText);
+      setMessage('');
+    } else {
+      console.log('Not sending - no finalText');
+    }
+  });
+
+  useEffect(() => {
+    if (transcript && isListening) {
+      setMessage(transcript);
+    }
+  }, [transcript, isListening]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -13,16 +31,38 @@ export const ChatInput = ({ onSendMessage, disabled }) => {
     }
   };
 
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit}>
       <Group gap="xs">
         <TextInput
           flex={1}
-          placeholder="Ask AuraFlow anything..."
+          placeholder={isListening ? "Listening..." : "Ask AuraFlow anything..."}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={disabled}
         />
+        {isSupported && (
+          <ActionIcon
+            onClick={toggleListening}
+            variant="filled"
+            color={isListening ? "red" : "aura.1"}
+            disabled={disabled}
+            style={{
+              backgroundColor: isListening ? '#ef4444' : undefined,
+              color: isListening ? 'white' : undefined
+            }}
+          >
+            {isListening ? <IconMicrophoneOff size={16} /> : <IconMicrophone size={16} />}
+          </ActionIcon>
+        )}
         <ActionIcon
           type="submit"
           variant="filled"
