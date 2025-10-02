@@ -4,7 +4,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import { theme } from './theme';
 import { Header } from './components/Navigation/Header';
 import { BottomTabs } from './components/Navigation/BottomTabs';
-import { ChatPlaceholder } from './components/Chat/ChatPlaceholder';
+import { ChatInterface } from './components/Chat/ChatInterface';
 import { CalendarPlaceholder } from './components/Calendar/CalendarPlaceholder';
 import { TasksPlaceholder } from './components/Tasks/TasksPlaceholder';
 import { MeditationPlaceholder } from './components/Meditation/MeditationPlaceholder';
@@ -21,7 +21,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'chat':
-        return <ChatPlaceholder />;
+        return <ChatInterface />;
       case 'calendar':
         return <CalendarPlaceholder />;
       case 'tasks':
@@ -29,7 +29,7 @@ function App() {
       case 'meditation':
         return <MeditationPlaceholder />;
       default:
-        return <ChatPlaceholder />;
+        return <ChatInterface />;
     }
   };
 

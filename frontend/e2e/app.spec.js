@@ -4,14 +4,14 @@ test.describe('AuraFlow App', () => {
   test('loads and displays main interface', async ({ page }) => {
     await page.goto('/');
     
-    // Check header
-    await expect(page.getByText('AuraFlow')).toBeVisible();
+    // Check header exists
+    await expect(page.locator('header')).toBeVisible();
     
-    // Check theme toggle button
-    await expect(page.getByRole('button')).toBeVisible();
+    // Check theme toggle button in header
+    await expect(page.locator('header button')).toBeVisible();
     
-    // Check initial tab content
-    await expect(page.getByText('Chat Coming Soon')).toBeVisible();
+    // Check initial chat interface
+    await expect(page.getByText('Start a conversation with AuraFlow')).toBeVisible();
   });
 
   test('switches between tabs', async ({ page }) => {
@@ -31,14 +31,14 @@ test.describe('AuraFlow App', () => {
     
     // Back to Chat
     await page.getByRole('tab', { name: 'Chat' }).click();
-    await expect(page.getByText('Chat Coming Soon')).toBeVisible();
+    await expect(page.getByText('Start a conversation with AuraFlow')).toBeVisible();
   });
 
   test('theme toggle works', async ({ page }) => {
     await page.goto('/');
     
-    // Click theme toggle
-    await page.getByRole('button').click();
+    // Click theme toggle button in header specifically
+    await page.locator('header button').click();
     
     // Verify theme changed (check for dark mode indicator)
     await expect(page.locator('html')).toHaveAttribute('data-mantine-color-scheme', 'dark');
