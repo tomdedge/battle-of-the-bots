@@ -103,23 +103,37 @@ io.on('connection', async (socket) => {
     );
     
     const models = await Promise.race([modelsPromise, timeoutPromise]);
+    const firstAvailableModel = models.data?.[0]?.id;
+    
+    if (!firstAvailableModel) {
+      throw new Error('No models available from API');
+    }
+    
     socket.emit('models', { 
       models: models.data || [], 
-      initialModel: preferences?.preferred_model || models.data?.[0]?.id || 'gpt-4o-mini',
+      initialModel: preferences?.preferred_model || firstAvailableModel,
       user: socket.user
     });
   } catch (error) {
     console.error('Failed to fetch models:', error.message);
-    // Fallback with common models
-    socket.emit('models', { 
-      models: [
-        { id: 'gpt-4o-mini' },
-        { id: 'gpt-4o' },
-        { id: 'gpt-3.5-turbo' }
-      ], 
-      initialModel: 'gpt-4o-mini',
-      user: socket.user
-    });
+    // Try to get models one more time without timeout
+    try {
+      const models = await aiService.getModels();
+      const firstAvailableModel = models.data?.[0]?.id;
+      
+      if (firstAvailableModel) {
+        socket.emit('models', { 
+          models: models.data || [], 
+          initialModel: firstAvailableModel,
+          user: socket.user
+        });
+      } else {
+        throw new Error('No models in API response');
+      }
+    } catch (retryError) {
+      console.error('Retry failed:', retryError.message);
+      socket.emit('error', { message: 'Unable to load available models' });
+    }
   }
 
   socket.on('chat_message', async (data) => {

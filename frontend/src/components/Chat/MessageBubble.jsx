@@ -29,7 +29,6 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
         )}
         
         <Paper
-          p="sm"
           style={{
             maxWidth: '80%',
             backgroundColor: isUser 
@@ -40,7 +39,7 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
             color: isUser ? 'white' : 'var(--mantine-color-text)',
             order: isUser ? 1 : 2,
             position: 'relative',
-            paddingRight: messageId && (onDelete || onRegenerate) ? '32px' : undefined
+            padding: messageId && (onDelete || onRegenerate) ? '12px 32px 12px 12px' : '12px'
           }}
         >
           <ReactMarkdown>{message}</ReactMarkdown>
