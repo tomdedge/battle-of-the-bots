@@ -1,59 +1,113 @@
 import { useEffect, useState } from 'react';
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
+import { useAuth } from '../contexts/AuthContext';
 
 const MODEL_STORAGE_KEY = 'auraflow_selected_model';
 
 export const useSocket = () => {
+  const { token, isAuthenticated, user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
+  const [chatHistory, setChatHistory] = useState([]);
 
   useEffect(() => {
-    connectSocket();
+    if (isAuthenticated && token) {
+      // Connect with authentication token
+      const socketInstance = connectSocket(token);
 
-    const onConnect = () => setIsConnected(true);
-    const onDisconnect = () => setIsConnected(false);
-    const onModels = ({ models, initialModel }) => {
-      setModels(models || []);
+      const onConnect = () => setIsConnected(true);
+      const onDisconnect = () => setIsConnected(false);
       
-      // Check localStorage first, then fallback to initialModel
-      const storedModel = localStorage.getItem(MODEL_STORAGE_KEY);
-      const modelToUse = storedModel || initialModel || 'gpt-4o-mini';
-      setSelectedModel(modelToUse);
-    };
+      const onModels = ({ models, initialModel, user: serverUser }) => {
+        setModels(models || []);
+        setSelectedModel(initialModel || 'gpt-4o-mini');
+      };
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('models', onModels);
+      const onChatHistory = (history) => {
+        setChatHistory(history);
+      };
 
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('models', onModels);
-      disconnectSocket();
-    };
-  }, []);
+      const onAIResponse = (response) => {
+        // Update the last pending message with the AI response
+        setChatHistory(prev => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          if (lastIndex >= 0 && updated[lastIndex].pending) {
+            updated[lastIndex] = {
+              ...updated[lastIndex],
+              response: response.message,
+              pending: false,
+              timestamp: response.timestamp
+            };
+          }
+          return updated;
+        });
+      };
+
+      socketInstance.on('connect', onConnect);
+      socketInstance.on('disconnect', onDisconnect);
+      socketInstance.on('models', onModels);
+      socketInstance.on('chat_history', onChatHistory);
+      socketInstance.on('ai_response', onAIResponse);
+
+      return () => {
+        if (socketInstance) {
+          socketInstance.off('connect', onConnect);
+          socketInstance.off('disconnect', onDisconnect);
+          socketInstance.off('models', onModels);
+          socketInstance.off('chat_history', onChatHistory);
+          socketInstance.off('ai_response', onAIResponse);
+        }
+        disconnectSocket();
+      };
+    } else {
+      // Clear state when not authenticated
+      setIsConnected(false);
+      setChatHistory([]);
+      setModels([]);
+    }
+  }, [isAuthenticated, token]);
 
   const handleModelChange = (model) => {
-    localStorage.setItem(MODEL_STORAGE_KEY, model);
     setSelectedModel(model);
+    // Update server-side preference
+    if (socket && socket.connected) {
+      socket.emit('update_model_preference', { model });
+    }
   };
 
   const sendMessage = (message) => {
-    socket.emit('chat_message', { message, model: selectedModel });
+    if (isAuthenticated && socket && socket.connected) {
+      socket.emit('chat_message', { message, model: selectedModel });
+      
+      // Optimistically add user message to history
+      setChatHistory(prev => [...prev, {
+        message,
+        response: null, // Will be filled when AI responds
+        model: selectedModel,
+        timestamp: new Date().toISOString(),
+        pending: true
+      }]);
+    }
   };
 
   const onAIResponse = (callback) => {
-    socket.on('ai_response', callback);
-    return () => socket.off('ai_response', callback);
+    if (socket) {
+      socket.on('ai_response', callback);
+      return () => socket.off('ai_response', callback);
+    }
+    return () => {};
   };
 
   return { 
-    isConnected, 
+    isConnected: isConnected && isAuthenticated, 
     sendMessage, 
     onAIResponse, 
     models, 
     selectedModel, 
-    setSelectedModel: handleModelChange 
+    setSelectedModel: handleModelChange,
+    chatHistory,
+    user
   };
 };
