@@ -45,11 +45,13 @@ export const useSocket = () => {
         });
       };
 
-      socketInstance.on('connect', onConnect);
-      socketInstance.on('disconnect', onDisconnect);
-      socketInstance.on('models', onModels);
-      socketInstance.on('chat_history', onChatHistory);
-      socketInstance.on('ai_response', onAIResponse);
+      if (socketInstance) {
+        socketInstance.on('connect', onConnect);
+        socketInstance.on('disconnect', onDisconnect);
+        socketInstance.on('models', onModels);
+        socketInstance.on('chat_history', onChatHistory);
+        socketInstance.on('ai_response', onAIResponse);
+      }
 
       return () => {
         if (socketInstance) {
@@ -95,7 +97,11 @@ export const useSocket = () => {
   const onAIResponse = (callback) => {
     if (socket) {
       socket.on('ai_response', callback);
-      return () => socket.off('ai_response', callback);
+      return () => {
+        if (socket) {
+          socket.off('ai_response', callback);
+        }
+      };
     }
     return () => {};
   };
