@@ -1,3 +1,5 @@
 node_modules
 .env
 frontend/coverage
+frontend/test-results/
+frontend/build

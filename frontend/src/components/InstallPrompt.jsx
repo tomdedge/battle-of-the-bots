@@ -7,19 +7,14 @@ export const InstallPrompt = () => {
   const { isInstallable, installApp, isInstalled } = usePWA();
   const [dismissed, setDismissed] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [showDebug, setShowDebug] = useState(process.env.NODE_ENV === 'development');
 
-  // Always show in development for testing
-  if (process.env.NODE_ENV === 'development' && !dismissed) {
-    // Show component for debugging
-  } else {
-    // Production logic
-    if (isInstalled) return null;
-    if (!isInstallable && !showManual && dismissed) return null;
-    if (!isInstallable && !showManual) {
-      setTimeout(() => setShowManual(true), 5000);
-      return null;
-    }
+  // Don't show if already installed or dismissed
+  if (isInstalled || dismissed) return null;
+  
+  // If not installable, show manual instructions after delay
+  if (!isInstallable && !showManual) {
+    setTimeout(() => setShowManual(true), 5000);
+    return null;
   }
 
   const handleInstall = async () => {
@@ -45,14 +40,12 @@ export const InstallPrompt = () => {
       <Group justify="space-between" align="flex-start">
         <div style={{ flex: 1 }}>
           <Text size="sm" fw={600} mb={4}>
-            {isInstallable ? 'Install AuraFlow' : showDebug ? 'PWA Debug Mode' : 'Add to Home Screen'}
+            {isInstallable ? 'Install AuraFlow' : 'Add to Home Screen'}
           </Text>
           <Text size="xs" c="dimmed">
-            {showDebug 
-              ? `Installable: ${isInstallable}, Installed: ${isInstalled}`
-              : isInstallable 
-                ? 'Add to your home screen for quick access'
-                : 'Use browser menu → "Add to Home Screen"'
+            {isInstallable 
+              ? 'Add to your home screen for quick access'
+              : 'Use browser menu → "Add to Home Screen"'
             }
           </Text>
         </div>

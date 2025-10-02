@@ -16,14 +16,12 @@ export const usePWA = () => {
     setIsInstalled(checkInstalled());
 
     const handleBeforeInstallPrompt = (e) => {
-      console.log('beforeinstallprompt fired');
       e.preventDefault();
       setDeferredPrompt(e);
       setIsInstallable(true);
     };
 
     const handleAppInstalled = () => {
-      console.log('App installed');
       setIsInstalled(true);
       setIsInstallable(false);
       setDeferredPrompt(null);
@@ -32,18 +30,6 @@ export const usePWA = () => {
     // Add listeners
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
-
-    // Debug: Check if PWA criteria are met
-    setTimeout(() => {
-      const installed = checkInstalled();
-      console.log('PWA Debug:', {
-        hasServiceWorker: 'serviceWorker' in navigator,
-        isSecure: location.protocol === 'https:' || location.hostname === 'localhost',
-        hasManifest: !!document.querySelector('link[rel="manifest"]'),
-        isInstalled: installed,
-        userAgent: navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Other'
-      });
-    }, 2000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);

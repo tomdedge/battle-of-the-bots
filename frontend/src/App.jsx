@@ -9,9 +9,6 @@ import { CalendarPlaceholder } from './components/Calendar/CalendarPlaceholder';
 import { TasksPlaceholder } from './components/Tasks/TasksPlaceholder';
 import { MeditationPlaceholder } from './components/Meditation/MeditationPlaceholder';
 import { InstallPrompt } from './components/InstallPrompt';
-import { PWAStatus } from './components/PWAStatus';
-import { PWALauncher } from './components/PWALauncher';
-import { PWAInstructions } from './components/PWAInstructions';
 import '@mantine/core/styles.css';
 
 function App() {
@@ -59,9 +56,6 @@ function App() {
           
           <BottomTabs activeTab={activeTab} setActiveTab={setActiveTab} />
           <InstallPrompt />
-          <PWAStatus />
-          <PWALauncher />
-          <PWAInstructions />
         </AppShell>
       </MantineProvider>
     </>
