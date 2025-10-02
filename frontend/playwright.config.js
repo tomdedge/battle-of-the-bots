@@ -21,5 +21,8 @@ export default defineConfig({
     command: 'npm start',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    env: {
+      REACT_APP_MSW_ENABLED: 'true'
+    }
   },
 });

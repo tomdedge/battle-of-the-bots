@@ -1,3 +1,8 @@
 node_modules
 .env
 frontend/coverage
+
+# Test artifacts
+frontend/test-results/
+frontend/playwright-report/
+backend/test-results/

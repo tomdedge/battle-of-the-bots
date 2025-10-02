@@ -1,8 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('AuraFlow App', () => {
+  test.beforeEach(async ({ page }) => {
+    // Set mock token directly for E2E tests
+    await page.addInitScript(() => {
+      localStorage.setItem('authToken', 'mock-jwt-token');
+    });
+  });
+
   test('loads and displays main interface', async ({ page }) => {
     await page.goto('/');
+    
+    // Wait for auth to load
+    await page.waitForTimeout(1000);
     
     // Check header exists
     await expect(page.locator('header')).toBeVisible();
@@ -10,12 +20,13 @@ test.describe('AuraFlow App', () => {
     // Check theme toggle button in header
     await expect(page.locator('header button')).toBeVisible();
     
-    // Check initial chat interface
-    await expect(page.getByText('Start a conversation with AuraFlow')).toBeVisible();
+    // Check authenticated chat interface
+    await expect(page.getByText('Welcome to AuraFlow, Test User!')).toBeVisible();
   });
 
   test('switches between tabs', async ({ page }) => {
     await page.goto('/');
+    await page.waitForTimeout(1000);
     
     // Click Calendar tab
     await page.getByRole('tab', { name: 'Calendar' }).click();
@@ -31,11 +42,12 @@ test.describe('AuraFlow App', () => {
     
     // Back to Chat
     await page.getByRole('tab', { name: 'Chat' }).click();
-    await expect(page.getByText('Start a conversation with AuraFlow')).toBeVisible();
+    await expect(page.getByText('Welcome to AuraFlow, Test User!')).toBeVisible();
   });
 
   test('theme toggle works', async ({ page }) => {
     await page.goto('/');
+    await page.waitForTimeout(1000);
     
     // Click theme toggle button in header specifically
     await page.locator('header button').click();

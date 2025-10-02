@@ -5,7 +5,6 @@ import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 
 export const ChatInterface = () => {
-  const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const { 
     isConnected, 
@@ -13,19 +12,14 @@ export const ChatInterface = () => {
     onAIResponse, 
     models, 
     selectedModel, 
-    setSelectedModel 
+    setSelectedModel,
+    chatHistory,
+    user
   } = useSocket();
   const scrollAreaRef = useRef();
 
   useEffect(() => {
     const cleanup = onAIResponse((response) => {
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        message: response.message,
-        isUser: false,
-        timestamp: response.timestamp,
-        error: response.error
-      }]);
       setIsLoading(false);
     });
 
@@ -33,32 +27,47 @@ export const ChatInterface = () => {
   }, [onAIResponse]);
 
   useEffect(() => {
-    // Auto-scroll to bottom
+    // Auto-scroll to bottom when chat history updates
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight });
     }
-  }, [messages]);
+  }, [chatHistory]);
 
   const handleSendMessage = (message) => {
-    // Add user message
-    setMessages(prev => [...prev, {
-      id: Date.now(),
-      message,
-      isUser: true,
-      timestamp: new Date().toISOString()
-    }]);
-
-    // Send to backend
     sendMessage(message);
     setIsLoading(true);
   };
+
+  // Convert chat history to message format
+  const messages = chatHistory.flatMap(chat => {
+    const msgs = [{
+      id: `user-${chat.timestamp}`,
+      message: chat.message,
+      isUser: true,
+      timestamp: chat.timestamp
+    }];
+    
+    if (chat.response && !chat.pending) {
+      msgs.push({
+        id: `ai-${chat.timestamp}`,
+        message: chat.response,
+        isUser: false,
+        timestamp: chat.timestamp
+      });
+    }
+    
+    return msgs;
+  });
 
   return (
     <Stack h="100%" gap={0}>
       <ScrollArea flex={1} p="md" ref={scrollAreaRef}>
         {messages.length === 0 ? (
           <Center h="100%">
-            <Text c="dimmed">Start a conversation with AuraFlow</Text>
+            <Stack align="center" gap="xs">
+              <Text c="dimmed">Welcome to AuraFlow, {user?.name}!</Text>
+              <Text size="sm" c="dimmed">Start a conversation about your productivity and mindfulness</Text>
+            </Stack>
           </Center>
         ) : (
           messages.map((msg) => (
