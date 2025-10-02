@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Stack, SegmentedControl, Paper, LoadingOverlay, Text } from '@mantine/core';
+import { Stack, SegmentedControl, Paper, LoadingOverlay, Text, Group, Button, ActionIcon, Popover, Alert } from '@mantine/core';
+import { DatePicker } from '@mantine/dates';
+import { IconChevronLeft, IconChevronRight, IconCalendar, IconAlertCircle } from '@tabler/icons-react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,6 +17,7 @@ export const CalendarView = () => {
   const [events, setEvents] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const { token } = useAuth();
 
   useEffect(() => {
@@ -25,6 +28,7 @@ export const CalendarView = () => {
 
   const loadCalendarData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const api = new ApiService(token);
       const { start, end } = getDateRange(date, view);
@@ -59,6 +63,7 @@ export const CalendarView = () => {
       setSuggestions(analysisResponse.suggestions || []);
     } catch (error) {
       console.error('Failed to load calendar data:', error);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -85,6 +90,47 @@ export const CalendarView = () => {
     setEvents(prev => prev.filter(event => 
       event.type !== 'suggestion' || event.suggestion !== suggestion
     ));
+  };
+
+  const navigateDate = (action) => {
+    const newDate = moment(date);
+    if (action === 'prev') {
+      newDate.subtract(1, view === 'agenda' ? 'month' : view);
+    } else if (action === 'next') {
+      newDate.add(1, view === 'agenda' ? 'month' : view);
+    } else if (action === 'today') {
+      setDate(new Date());
+      return;
+    }
+    setDate(newDate.toDate());
+  };
+
+  const getDateLabel = () => {
+    const m = moment(date);
+    if (view === 'month' || view === 'agenda') {
+      return m.format('MMMM YYYY');
+    } else if (view === 'week') {
+      const start = m.clone().startOf('week');
+      const end = m.clone().endOf('week');
+      
+      if (start.month() === end.month()) {
+        // Same month: "Oct 5-11, 2025"
+        return `${start.format('MMM D')}-${end.format('D, YYYY')}`;
+      } else {
+        // Different months: "Sep 29 - Oct 5, 2025"
+        return `${start.format('MMM D')} - ${end.format('MMM D, YYYY')}`;
+      }
+    } else {
+      return m.format('MMMM D, YYYY');
+    }
+  };
+
+  const customFormats = {
+    dayHeaderFormat: (date, culture, localizer) => {
+      const dayName = moment(date).format('ddd');
+      const dayNumber = moment(date).format('D');
+      return `${dayName}\n${dayNumber}`;
+    }
   };
 
   const handleEventClick = (event) => {
@@ -118,17 +164,80 @@ export const CalendarView = () => {
   return (
     <Stack h="100%" gap="lg">
       <Paper p="md">
+        <Group justify="space-between" align="center" wrap="nowrap">
+          <ActionIcon 
+            variant="subtle" 
+            onClick={() => navigateDate('prev')}
+            size="lg"
+          >
+            <IconChevronLeft size={18} />
+          </ActionIcon>
+          
+          <Text fw={500} size="lg" style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            {getDateLabel()}
+          </Text>
+          
+          <ActionIcon 
+            variant="subtle" 
+            onClick={() => navigateDate('next')}
+            size="lg"
+          >
+            <IconChevronRight size={18} />
+          </ActionIcon>
+        </Group>
+        
+        <Group justify="center" mt="sm" gap="sm">
+          <Button variant="light" onClick={() => navigateDate('today')}>
+            Today
+          </Button>
+          <Popover width={300} position="bottom" withArrow shadow="md">
+            <Popover.Target>
+              <ActionIcon variant="subtle" size="lg">
+                <IconCalendar size={18} />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <DatePicker
+                value={date}
+                onChange={(newDate) => newDate && setDate(newDate)}
+              />
+            </Popover.Dropdown>
+          </Popover>
+        </Group>
+        
         <SegmentedControl
           value={view}
           onChange={setView}
           data={[
-            { label: 'Day', value: 'day' },
+            { label: 'Month', value: 'month' },
             { label: 'Week', value: 'week' },
-            { label: 'Month', value: 'month' }
+            { label: 'Day', value: 'day' },
+            { label: 'Agenda', value: 'agenda' }
           ]}
           fullWidth
+          mt="md"
         />
       </Paper>
+
+      {error && (
+        <Button 
+          variant="default" 
+          leftSection={<IconAlertCircle size={16} />}
+          onClick={loadCalendarData}
+          fullWidth
+          style={{ 
+            height: 'auto', 
+            padding: '12px',
+            textAlign: 'center',
+            whiteSpace: 'pre-line',
+            backgroundColor: '#fca5a5',
+            borderColor: '#f87171',
+            color: '#7f1d1d'
+          }}
+        >
+          Failed to load calendar data.{'\n'}Click here to try again.
+        </Button>
+      )}
 
       {suggestions.length > 0 && view === 'day' && (
         <Text size="sm" ta="center" style={{ color: 'var(--mantine-color-gray-7)' }}>
@@ -136,7 +245,7 @@ export const CalendarView = () => {
         </Text>
       )}
 
-      <Paper flex={1} pos="relative" style={{ minHeight: '500px' }} p="md">
+      <Paper flex={1} pos="relative" style={{ height: 'calc(100vh - 200px)' }} p="md">
         <LoadingOverlay visible={loading} />
         
         <Calendar
@@ -151,6 +260,7 @@ export const CalendarView = () => {
           onNavigate={setDate}
           onSelectEvent={handleEventClick}
           eventPropGetter={eventStyleGetter}
+          formats={customFormats}
           style={{ height: '100%' }}
           components={{}}
         />

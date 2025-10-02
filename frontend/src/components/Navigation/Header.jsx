@@ -44,13 +44,25 @@ export function Header() {
           <Text size="sm" fw={500}>
             Signed in as {user?.name}
           </Text>
+          
           <Button
             leftSection={<IconLogout size={16} />}
-            variant="filled"
-            color="red"
+            variant="default"
             onClick={handleLogout}
             fullWidth
             size="md"
+            style={{
+              borderColor: '#dc2626',
+              color: '#dc2626'
+            }}
+            styles={{
+              root: {
+                '&:hover': {
+                  backgroundColor: '#dc2626',
+                  color: 'white'
+                }
+              }
+            }}
           >
             Sign Out
           </Button>
