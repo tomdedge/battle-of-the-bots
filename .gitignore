@@ -1,6 +1,7 @@
 node_modules
 .env
-frontend/coverage
+frontend/coverage/
+frontend/build/
 
 # Test artifacts
 frontend/test-results/

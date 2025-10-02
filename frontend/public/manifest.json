@@ -1,0 +1,30 @@
+{
+  "name": "AuraFlow - Mindful Flow Assistant",
+  "short_name": "AuraFlow",
+  "description": "A Mindful Flow Assistant for consistent focus and positive digital habits",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "theme_color": "#6366f1",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["productivity", "health"],
+  "launch_handler": {
+    "client_mode": "navigate-new"
+  },
+  "id": "auraflow-pwa",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

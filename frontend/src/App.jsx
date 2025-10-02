@@ -10,6 +10,7 @@ import { ChatInterface } from './components/Chat/ChatInterface';
 import { CalendarView } from './components/Calendar/CalendarView';
 import { TasksPlaceholder } from './components/Tasks/TasksPlaceholder';
 import { MeditationPlaceholder } from './components/Meditation/MeditationPlaceholder';
+import { InstallPrompt } from './components/InstallPrompt';
 import '@mantine/core/styles.css';
 
 function App() {
@@ -58,6 +59,7 @@ function App() {
               </AppShell.Main>
               
               <BottomTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+              <InstallPrompt />
             </AppShell>
           </ProtectedRoute>
         </AuthProvider>
