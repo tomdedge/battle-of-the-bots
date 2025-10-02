@@ -9,8 +9,6 @@ class DatabaseService {
   }
 
   async createUser(googleProfile, tokens) {
-    const imageCache = require('./imageCache');
-    
     const query = `
       INSERT INTO users (google_id, email, name, picture, access_token, refresh_token)
       VALUES ($1, $2, $3, $4, $5, $6)
@@ -22,20 +20,11 @@ class DatabaseService {
       RETURNING *
     `;
     
-    // Cache the profile image
-    const originalPicture = googleProfile.photos?.[0]?.value;
-    let cachedPicture = originalPicture;
-    
-    if (originalPicture) {
-      // Use google_id as user identifier for caching
-      cachedPicture = await imageCache.cacheProfileImage(googleProfile.id, originalPicture);
-    }
-    
     const values = [
       googleProfile.id,
       googleProfile.emails[0].value,
       googleProfile.displayName,
-      cachedPicture,
+      googleProfile.photos?.[0]?.value,
       tokens.accessToken,
       tokens.refreshToken
     ];
