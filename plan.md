@@ -66,6 +66,20 @@ A Mindful Flow Assistant that helps users maintain focus and build positive digi
 ## Testing Strategy
 
 ### Unit Tests (Jest + React Testing Library)
+- **Purpose**: Test individual components in isolation
+- **Location**: `frontend/src/__tests__/`
+- **Coverage**: Component rendering, props, user interactions
+- **Approach**: Mock Mantine components to avoid browser API dependencies
+
+```bash
+# Run unit tests
+cd frontend && npm test
+
+# Run with coverage
+cd frontend && npm test -- --coverage --watchAll=false
+```
+
+**Test Structure:**
 ```
 /frontend/src/__tests__/
 ├── components/
@@ -75,6 +89,9 @@ A Mindful Flow Assistant that helps users maintain focus and build positive digi
 │   ├── Calendar/
 │   │   ├── CalendarView.test.jsx
 │   │   └── FocusBlockSuggestion.test.jsx
+│   ├── Navigation/
+│   │   ├── Header.test.jsx          # ✅ Implemented
+│   │   └── BottomTabs.test.jsx      # ✅ Implemented
 │   └── Meditation/
 │       └── BoxBreathing.test.jsx
 ├── hooks/
@@ -84,7 +101,37 @@ A Mindful Flow Assistant that helps users maintain focus and build positive digi
     └── api.test.js
 ```
 
-**Backend Unit Tests**
+### E2E Tests (Playwright)
+- **Purpose**: Test complete user workflows in real browsers
+- **Location**: `frontend/e2e/`
+- **Coverage**: Tab navigation, theme toggling, app loading, user journeys
+- **Benefits**: No mocking needed, tests actual user experience
+
+```bash
+# Run E2E tests
+cd frontend && npm run test:e2e
+
+# Run with UI mode
+cd frontend && npm run test:e2e:ui
+
+# View test report
+cd frontend && npx playwright show-report
+```
+
+**Test Structure:**
+```
+/frontend/e2e/
+├── app.spec.js              # ✅ Implemented (basic flows)
+├── auth.spec.js             # TODO: Google sign-in flow
+├── calendar.spec.js         # TODO: Calendar view and suggestions
+├── chat.spec.js             # TODO: AI chat interactions
+├── meditation.spec.js       # TODO: Box breathing interface
+└── mocks/
+    ├── googleCalendar.js    # TODO: Mock Google Calendar API responses
+    └── testFixtures.js      # TODO: Consistent test calendar data
+```
+
+**Backend Unit Tests (Future)**
 ```
 /backend/__tests__/
 ├── services/
@@ -97,22 +144,13 @@ A Mindful Flow Assistant that helps users maintain focus and build positive digi
 ├── utils/
 │   └── logger.test.js
 └── mocks/
-    └── googleApis.js      # Mock Google Calendar/Tasks APIs
-```
-
-### Integration Tests (Playwright)
-```
-/e2e/
-├── auth.spec.js           # Google sign-in flow
-├── calendar.spec.js       # Calendar view and suggestions
-├── chat.spec.js           # AI chat interactions
-├── meditation.spec.js     # Box breathing interface
-└── mocks/
-    ├── googleCalendar.js  # Mock Google Calendar API responses
-    └── testFixtures.js    # Consistent test calendar data
+    └── googleApis.js        # Mock Google Calendar/Tasks APIs
 ```
 
 **Test Scenarios**
+- [x] App loading and basic navigation
+- [x] Tab switching functionality  
+- [x] Theme toggle functionality
 - [ ] User authentication flow
 - [ ] Calendar data loading and display
 - [ ] AI suggestion generation and approval across all views
@@ -120,6 +158,18 @@ A Mindful Flow Assistant that helps users maintain focus and build positive digi
 - [ ] Calendar view switching (month/week/day)
 - [ ] Focus block suggestion acceptance/dismissal
 - [ ] Mock Google Calendar API to avoid rate limits and ensure consistent test data
+
+### Why This Two-Tier Approach?
+
+**Unit Tests (Jest + RTL):**
+- Fast feedback during development
+- Good for component logic and props testing
+- Mantine components mocked to avoid browser API issues
+
+**E2E Tests (Playwright):**
+- Reliable integration testing without Mantine v7+ mocking complexity
+- Tests actual user experience in real browsers
+- Catches integration bugs that unit tests miss
 
 ## Development Phases
 
