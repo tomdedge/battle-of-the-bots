@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { Stack, ScrollArea, Text, Loader, Center } from '@mantine/core';
 import { useSocket } from '../../hooks/useSocket';
+import { useAuth } from '../../contexts/AuthContext';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
+import ApiService from '../../services/api';
 
 export const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const { token } = useAuth();
   const { 
     isConnected, 
     sendMessage, 
     onAIResponse, 
-    models, 
-    selectedModel, 
-    setSelectedModel,
     chatHistory,
+    setChatHistory,
+    regenerateResponse,
     user
   } = useSocket();
   const scrollAreaRef = useRef();
@@ -38,10 +40,39 @@ export const ChatInterface = () => {
     setIsLoading(true);
   };
 
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      const api = new ApiService(token);
+      await api.deleteChatMessage(messageId);
+      setChatHistory(prev => prev.filter(chat => chat.id !== messageId));
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+    }
+  };
+
+  const handleRegenerateResponse = async (messageId) => {
+    // Find the chat entry for this message
+    const chat = chatHistory.find(c => c.id === messageId);
+    if (chat && chat.message) {
+      setIsLoading(true);
+      
+      // Clear the existing response and mark as pending
+      setChatHistory(prev => prev.map(c => 
+        c.id === messageId 
+          ? { ...c, response: null, pending: true }
+          : c
+      ));
+      
+      // Send the original message to get a new response
+      regenerateResponse(chat.message);
+    }
+  };
+
   // Convert chat history to message format
   const messages = chatHistory.flatMap(chat => {
     const msgs = [{
-      id: `user-${chat.timestamp}`,
+      id: `user-${chat.id || chat.timestamp}`,
+      messageId: chat.id,
       message: chat.message,
       isUser: true,
       timestamp: chat.timestamp
@@ -49,7 +80,8 @@ export const ChatInterface = () => {
     
     if (chat.response && !chat.pending) {
       msgs.push({
-        id: `ai-${chat.timestamp}`,
+        id: `ai-${chat.id || chat.timestamp}`,
+        messageId: chat.id,
         message: chat.response,
         isUser: false,
         timestamp: chat.timestamp
@@ -59,9 +91,13 @@ export const ChatInterface = () => {
     return msgs;
   });
 
+  // Check if latest message is from AI
+  const latestMessage = messages[messages.length - 1];
+  const canRegenerate = latestMessage && !latestMessage.isUser;
+
   return (
-    <Stack h="100%" gap={0}>
-      <ScrollArea flex={1} p="md" ref={scrollAreaRef}>
+    <Stack h="100%" gap={0} style={{ display: 'flex', flexDirection: 'column' }}>
+      <ScrollArea style={{ flex: 1 }} p="xs" ref={scrollAreaRef}>
         {messages.length === 0 ? (
           <Center h="100%">
             <Stack align="center" gap="xs">
@@ -70,8 +106,14 @@ export const ChatInterface = () => {
             </Stack>
           </Center>
         ) : (
-          messages.map((msg) => (
-            <MessageBubble key={msg.id} {...msg} user={user} />
+          messages.map((msg, index) => (
+            <MessageBubble 
+              key={msg.id} 
+              {...msg} 
+              user={user} 
+              onDelete={msg.isUser ? handleDeleteMessage : null}
+              onRegenerate={!msg.isUser && canRegenerate && index === messages.length - 1 ? handleRegenerateResponse : null}
+            />
           ))
         )}
         {isLoading && (
@@ -81,7 +123,15 @@ export const ChatInterface = () => {
         )}
       </ScrollArea>
       
-      <Stack p="md" gap="xs">
+      <Stack 
+        p="sm" 
+        gap="xs" 
+        style={{ 
+          flexShrink: 0,
+          backgroundColor: 'var(--mantine-color-body)',
+          borderTop: '1px solid var(--mantine-color-gray-3)'
+        }}
+      >
         {!isConnected && (
           <Text size="xs" c="red">Connecting...</Text>
         )}

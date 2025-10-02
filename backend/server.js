@@ -159,6 +159,17 @@ io.on('connection', async (socket) => {
     }
   });
 
+  // Handle chat clearing
+  socket.on('clear_chat_history', async () => {
+    try {
+      await dbService.clearChatHistory(socket.user.userId);
+      socket.emit('chat_history_cleared');
+    } catch (error) {
+      console.error('Failed to clear chat history:', error);
+      socket.emit('error', { message: 'Failed to clear chat history' });
+    }
+  });
+
   // Calendar events
   socket.on('calendar_sync_request', async () => {
     try {

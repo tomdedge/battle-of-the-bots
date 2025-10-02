@@ -28,6 +28,10 @@ export const useSocket = () => {
         setChatHistory(history);
       };
 
+      const onChatHistoryCleared = () => {
+        setChatHistory([]);
+      };
+
       const onAIResponse = (response) => {
         // Update the last pending message with the AI response
         setChatHistory(prev => {
@@ -50,6 +54,7 @@ export const useSocket = () => {
         socketInstance.on('disconnect', onDisconnect);
         socketInstance.on('models', onModels);
         socketInstance.on('chat_history', onChatHistory);
+        socketInstance.on('chat_history_cleared', onChatHistoryCleared);
         socketInstance.on('ai_response', onAIResponse);
       }
 
@@ -59,6 +64,7 @@ export const useSocket = () => {
           socketInstance.off('disconnect', onDisconnect);
           socketInstance.off('models', onModels);
           socketInstance.off('chat_history', onChatHistory);
+          socketInstance.off('chat_history_cleared', onChatHistoryCleared);
           socketInstance.off('ai_response', onAIResponse);
         }
         disconnectSocket();
@@ -106,6 +112,19 @@ export const useSocket = () => {
     return () => {};
   };
 
+  const clearChatHistory = () => {
+    if (socket && socket.connected) {
+      socket.emit('clear_chat_history');
+    }
+  };
+
+  const regenerateResponse = (originalMessage) => {
+    if (socket && socket.connected) {
+      // Send message without adding to history
+      socket.emit('chat_message', { message: originalMessage, model: selectedModel });
+    }
+  };
+
   return { 
     isConnected: isConnected && isAuthenticated, 
     sendMessage, 
@@ -114,6 +133,9 @@ export const useSocket = () => {
     selectedModel, 
     setSelectedModel: handleModelChange,
     chatHistory,
+    setChatHistory,
+    clearChatHistory,
+    regenerateResponse,
     user
   };
 };

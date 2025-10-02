@@ -1,17 +1,32 @@
-import { Group, ActionIcon, Title, Drawer, Stack, Button, Text } from '@mantine/core';
-import { IconSun, IconMoon, IconMenu2, IconLogout } from '@tabler/icons-react';
+import { Group, ActionIcon, Title, Drawer, Stack, Button, Text, Modal } from '@mantine/core';
+import { IconSun, IconMoon, IconMenu2, IconLogout, IconTrash } from '@tabler/icons-react';
 import { useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../hooks/useSocket';
+import ApiService from '../../services/api';
 
 export function Header() {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const [opened, { open, close }] = useDisclosure(false);
-  const { user, logout } = useAuth();
+  const [confirmOpened, { open: openConfirm, close: closeConfirm }] = useDisclosure(false);
+  const { user, logout, token } = useAuth();
+  const { setChatHistory, clearChatHistory } = useSocket();
 
   const handleLogout = () => {
     logout();
     close();
+  };
+
+  const handleClearChat = async () => {
+    try {
+      // Use socket for real-time clearing
+      clearChatHistory();
+      closeConfirm();
+      close();
+    } catch (error) {
+      console.error('Failed to clear chat:', error);
+    }
   };
 
   return (
@@ -46,6 +61,17 @@ export function Header() {
           </Text>
           
           <Button
+            leftSection={<IconTrash size={16} />}
+            variant="default"
+            onClick={openConfirm}
+            fullWidth
+            size="md"
+            color="red"
+          >
+            Clear Chat History
+          </Button>
+          
+          <Button
             leftSection={<IconLogout size={16} />}
             variant="default"
             onClick={handleLogout}
@@ -68,6 +94,25 @@ export function Header() {
           </Button>
         </Stack>
       </Drawer>
+
+      <Modal
+        opened={confirmOpened}
+        onClose={closeConfirm}
+        title="Clear Chat History"
+        centered
+      >
+        <Stack gap="md">
+          <Text>Are you sure you want to clear all chat history? This action cannot be undone.</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeConfirm}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleClearChat}>
+              Clear All
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

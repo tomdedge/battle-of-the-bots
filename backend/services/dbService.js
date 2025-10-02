@@ -68,7 +68,7 @@ class DatabaseService {
 
   async getChatHistory(userId, limit = 50, offset = 0) {
     const query = `
-      SELECT message, response, model, timestamp, session_id
+      SELECT id, message, response, model, timestamp, session_id
       FROM chat_messages 
       WHERE user_id = $1 
       ORDER BY timestamp DESC 
@@ -76,6 +76,16 @@ class DatabaseService {
     `;
     const result = await this.pool.query(query, [userId, limit, offset]);
     return result.rows.reverse(); // Return chronological order
+  }
+
+  async clearChatHistory(userId) {
+    const query = 'DELETE FROM chat_messages WHERE user_id = $1';
+    await this.pool.query(query, [userId]);
+  }
+
+  async deleteChatMessage(userId, messageId) {
+    const query = 'DELETE FROM chat_messages WHERE user_id = $1 AND id = $2';
+    await this.pool.query(query, [userId, messageId]);
   }
 
   async getUserPreferences(userId) {

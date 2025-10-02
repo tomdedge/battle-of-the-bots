@@ -1,78 +1,105 @@
 class ApiService {
   constructor(token) {
-    this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
     this.token = token;
+    this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
   }
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const config = {
+  async clearChatHistory() {
+    const response = await fetch(`${this.baseURL}/auth/chat/history`, {
+      method: 'DELETE',
       headers: {
-        'Content-Type': 'application/json',
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    const response = await fetch(url, config);
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
-    }
-    
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      }
+    });
     return response.json();
   }
 
-  // Calendar methods
+  async deleteChatMessage(messageId) {
+    const response = await fetch(`${this.baseURL}/auth/chat/message/${messageId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.json();
+  }
+
   async getCalendarEvents(start, end) {
-    return this.request(`/api/calendar/events?start=${start}&end=${end}`);
+    const response = await fetch(`${this.baseURL}/api/calendar/events?start=${start}&end=${end}`, {
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    return response.json();
   }
 
   async analyzeCalendar(date) {
-    return this.request(`/api/calendar/analyze?date=${date}`);
-  }
-
-  async createFocusBlock(focusBlockData) {
-    return this.request('/api/calendar/focus-block', {
-      method: 'POST',
-      body: JSON.stringify(focusBlockData),
+    const response = await fetch(`${this.baseURL}/api/calendar/analyze?date=${date}`, {
+      headers: { 'Authorization': `Bearer ${this.token}` }
     });
+    return response.json();
   }
 
-  // Tasks methods
+  async createFocusBlock(focusBlock) {
+    const response = await fetch(`${this.baseURL}/api/calendar/focus-block`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(focusBlock)
+    });
+    return response.json();
+  }
+
   async getTaskLists() {
-    return this.request('/api/tasks/lists');
-  }
-
-  async getTasks(listId = '@default') {
-    return this.request(`/api/tasks?listId=${listId}`);
-  }
-
-  async createTask(taskData, listId = '@default') {
-    return this.request(`/api/tasks?listId=${listId}`, {
-      method: 'POST',
-      body: JSON.stringify(taskData),
+    const response = await fetch(`${this.baseURL}/api/tasks/lists`, {
+      headers: { 'Authorization': `Bearer ${this.token}` }
     });
+    return response.json();
   }
 
-  async updateTask(taskId, taskData, listId = '@default') {
-    return this.request(`/api/tasks/${taskId}?listId=${listId}`, {
+  async getTasks(listId) {
+    const url = listId ? `${this.baseURL}/api/tasks?listId=${listId}` : `${this.baseURL}/api/tasks`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    return response.json();
+  }
+
+  async createTask(taskData, listId) {
+    const url = listId ? `${this.baseURL}/api/tasks?listId=${listId}` : `${this.baseURL}/api/tasks`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(taskData)
+    });
+    return response.json();
+  }
+
+  async updateTask(taskId, taskData, listId) {
+    const url = listId ? `${this.baseURL}/api/tasks/${taskId}?listId=${listId}` : `${this.baseURL}/api/tasks/${taskId}`;
+    const response = await fetch(url, {
       method: 'PUT',
-      body: JSON.stringify(taskData),
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(taskData)
     });
+    return response.json();
   }
 
-  async deleteTask(taskId, listId = '@default') {
-    return this.request(`/api/tasks/${taskId}?listId=${listId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async completeTask(taskId, listId = '@default') {
-    return this.request(`/api/tasks/${taskId}/complete?listId=${listId}`, {
+  async completeTask(taskId, listId) {
+    const url = listId ? `${this.baseURL}/api/tasks/${taskId}/complete?listId=${listId}` : `${this.baseURL}/api/tasks/${taskId}/complete`;
+    const response = await fetch(url, {
       method: 'POST',
+      headers: { 'Authorization': `Bearer ${this.token}` }
     });
+    return response.json();
   }
 }
 
