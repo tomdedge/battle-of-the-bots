@@ -4,6 +4,11 @@ A Mindful Flow Assistant designed to help individuals maintain consistent focus 
 
 ## Getting Started
 
+### Database Setup
+```bash
+./setup-db.sh
+```
+
 ### Backend
 ```bash
 cd backend
@@ -18,7 +23,16 @@ npm install
 npm start
 ```
 
-The backend runs on http://localhost:8080 and frontend on http://localhost:3000.
+### Database Admin (Optional)
+```bash
+npm run start:db-admin
+```
+
+## Access Points
+- **Frontend**: http://localhost:3000
+- **Backend**: http://localhost:8080
+- **Adminer**: http://localhost:5051 (Database admin)
+- **PostgREST API**: http://localhost:3001
 
 ## Features (MVP)
 - ✅ Custom AuraFlow theme with warm, mindful colors
@@ -26,6 +40,7 @@ The backend runs on http://localhost:8080 and frontend on http://localhost:3000.
 - ✅ Mobile-first responsive design
 - ✅ Bottom tab navigation
 - ✅ Placeholder components for all sections
+- ✅ Database admin interface
 
 ## Next Steps
 - [ ] Google OAuth authentication

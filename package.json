@@ -5,6 +5,8 @@
     "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "start:backend": "cd backend && npm run dev",
     "start:frontend": "cd frontend && npm start",
+    "start:db-admin": "./scripts/start-db-admin.sh",
+    "stop:db-admin": "docker-compose down",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "test": "cd frontend && npm test -- --watchAll=false",
     "test:e2e": "cd frontend && npm run test:e2e",

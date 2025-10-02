@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  postgrest:
+    image: postgrest/postgrest:v12.0.2
+    ports:
+      - "3001:3000"
+    environment:
+      PGRST_DB_URI: postgresql://localhost:5432/auraflow
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3001
+      PGRST_DB_ANON_ROLE: postgres
+    network_mode: host
+
+  adminer:
+    image: adminer:latest
+    ports:
+      - "5051:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: host.docker.internal
