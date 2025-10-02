@@ -26,13 +26,14 @@ jest.mock('@mantine/core', () => ({
 
 // Mock API service
 jest.mock('../../../services/api', () => {
-  return jest.fn().mockImplementation(() => ({
-    getTaskLists: jest.fn().mockResolvedValue({ taskLists: [{ id: '@default', title: 'My Tasks' }] }),
-    getTasks: jest.fn().mockResolvedValue({ tasks: [] }),
-    createTask: jest.fn().mockResolvedValue({}),
-    completeTask: jest.fn().mockResolvedValue({}),
-    deleteTask: jest.fn().mockResolvedValue({})
-  }));
+  return class MockApiService {
+    constructor() {}
+    getTaskLists = jest.fn().mockResolvedValue({ taskLists: [{ id: '@default', title: 'My Tasks' }] });
+    getTasks = jest.fn().mockResolvedValue({ tasks: [] });
+    createTask = jest.fn().mockResolvedValue({});
+    completeTask = jest.fn().mockResolvedValue({});
+    deleteTask = jest.fn().mockResolvedValue({});
+  };
 });
 
 // Mock AuthContext
