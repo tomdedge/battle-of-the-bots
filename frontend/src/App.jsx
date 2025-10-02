@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { MantineProvider, ColorSchemeScript, AppShell } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { theme } from './theme';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Header } from './components/Navigation/Header';
 import { BottomTabs } from './components/Navigation/BottomTabs';
 import { ChatInterface } from './components/Chat/ChatInterface';
-import { CalendarPlaceholder } from './components/Calendar/CalendarPlaceholder';
+import { CalendarView } from './components/Calendar/CalendarView';
 import { TasksPlaceholder } from './components/Tasks/TasksPlaceholder';
 import { MeditationPlaceholder } from './components/Meditation/MeditationPlaceholder';
 import { InstallPrompt } from './components/InstallPrompt';
@@ -24,7 +26,7 @@ function App() {
       case 'chat':
         return <ChatInterface />;
       case 'calendar':
-        return <CalendarPlaceholder />;
+        return <CalendarView />;
       case 'tasks':
         return <TasksPlaceholder />;
       case 'meditation':
@@ -38,25 +40,29 @@ function App() {
     <>
       <ColorSchemeScript defaultColorScheme="light" />
       <MantineProvider theme={theme} defaultColorScheme="light">
-        <AppShell
-          header={{ height: 60 }}
-          padding="md"
-          style={{
-            backgroundColor: colorScheme === 'dark' ? theme.other.backgroundDark : theme.other.backgroundLight,
-            minHeight: '100vh'
-          }}
-        >
-          <AppShell.Header>
-            <Header />
-          </AppShell.Header>
-          
-          <AppShell.Main style={{ paddingBottom: '80px' }}>
-            {renderContent()}
-          </AppShell.Main>
-          
-          <BottomTabs activeTab={activeTab} setActiveTab={setActiveTab} />
-          <InstallPrompt />
-        </AppShell>
+        <AuthProvider>
+          <ProtectedRoute>
+            <AppShell
+              header={{ height: 60 }}
+              padding="md"
+              style={{
+                backgroundColor: colorScheme === 'dark' ? theme.other.backgroundDark : theme.other.backgroundLight,
+                minHeight: '100vh'
+              }}
+            >
+              <AppShell.Header>
+                <Header />
+              </AppShell.Header>
+              
+              <AppShell.Main style={{ paddingBottom: '80px' }}>
+                {renderContent()}
+              </AppShell.Main>
+              
+              <BottomTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+              <InstallPrompt />
+            </AppShell>
+          </ProtectedRoute>
+        </AuthProvider>
       </MantineProvider>
     </>
   );

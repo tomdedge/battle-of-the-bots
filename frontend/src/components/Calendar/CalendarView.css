@@ -1,0 +1,44 @@
+/* Calendar theming for AuraFlow */
+.rbc-calendar {
+  --rbc-bg-color: var(--mantine-color-body);
+  --rbc-border-color: var(--mantine-color-gray-3);
+  --rbc-off-range-bg-color: var(--mantine-color-gray-0);
+  --rbc-today-bg-color: var(--mantine-color-aura-0);
+}
+
+/* Suggestion events styling */
+.rbc-event.suggestion-event {
+  background-color: var(--mantine-color-aura-1) !important;
+  border: 2px dashed var(--mantine-color-aura-2) !important;
+  opacity: 0.7;
+  cursor: pointer;
+  position: relative;
+}
+
+.rbc-event.suggestion-event:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+.rbc-event.suggestion-event::after {
+  content: "💡";
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 12px;
+}
+
+/* Actual events styling */
+.rbc-event.actual-event {
+  background-color: var(--mantine-color-blue-6);
+  border: 1px solid var(--mantine-color-blue-7);
+}
+
+.rbc-selected {
+  background-color: var(--mantine-color-aura-2) !important;
+}
+
+.rbc-today {
+  background-color: var(--mantine-color-aura-0);
+}
