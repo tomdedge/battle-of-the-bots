@@ -29,7 +29,7 @@ export const TaskItem = ({ task, onComplete, onDelete, onUpdate }) => {
           {onComplete && !isCompleted && (
             <Checkbox
               checked={false}
-              onChange={onComplete}
+              onChange={() => onComplete()}
               mt={2}
             />
           )}
@@ -98,18 +98,25 @@ export const TaskItem = ({ task, onComplete, onDelete, onUpdate }) => {
         {!editing && (
           <Menu shadow="md" width={120}>
             <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" size="sm">
+              <ActionIcon 
+                variant="light" 
+                color="dark" 
+                size="sm"
+                style={{ minWidth: '24px', minHeight: '24px' }}
+              >
                 <IconDots size={14} />
               </ActionIcon>
             </Menu.Target>
 
             <Menu.Dropdown>
-              <Menu.Item
-                leftSection={<IconEdit size={14} />}
-                onClick={() => setEditing(true)}
-              >
-                Edit
-              </Menu.Item>
+              {!isCompleted && (
+                <Menu.Item
+                  leftSection={<IconEdit size={14} />}
+                  onClick={() => setEditing(true)}
+                >
+                  Edit
+                </Menu.Item>
+              )}
               <Menu.Item
                 leftSection={<IconTrash size={14} />}
                 color="red"

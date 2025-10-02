@@ -11,17 +11,23 @@ class TasksService {
   }
 
   async getAuthenticatedClient(userId) {
-    const user = await dbService.getUserById(userId);
-    if (!user || !user.access_token) {
-      throw new Error('User not authenticated');
+    try {
+      const user = await dbService.getUserById(userId);
+      if (!user || !user.access_token) {
+        console.error('User not authenticated or missing tokens:', { userId, hasUser: !!user, hasToken: !!(user?.access_token) });
+        throw new Error('User not authenticated');
+      }
+      
+      this.oauth2Client.setCredentials({
+        access_token: user.access_token,
+        refresh_token: user.refresh_token
+      });
+      
+      return google.tasks({ version: 'v1', auth: this.oauth2Client });
+    } catch (error) {
+      console.error('Error getting authenticated client:', error);
+      throw error;
     }
-    
-    this.oauth2Client.setCredentials({
-      access_token: user.access_token,
-      refresh_token: user.refresh_token
-    });
-    
-    return google.tasks({ version: 'v1', auth: this.oauth2Client });
   }
 
   async getTaskLists(userId) {
@@ -50,13 +56,35 @@ class TasksService {
   }
 
   async updateTask(userId, taskId, taskData, taskListId = '@default') {
-    const tasks = await this.getAuthenticatedClient(userId);
-    const response = await tasks.tasks.update({
-      tasklist: taskListId,
-      task: taskId,
-      resource: taskData
-    });
-    return response.data;
+    try {
+      const tasks = await this.getAuthenticatedClient(userId);
+      
+      // First, get the existing task to preserve its data
+      console.log('Getting existing task:', { taskId, taskListId });
+      const existingTask = await tasks.tasks.get({
+        tasklist: taskListId,
+        task: taskId
+      });
+      console.log('Task found:', existingTask.data.title);
+      
+      // Merge new data with existing task data
+      const updateData = {
+        ...existingTask.data,
+        ...taskData,
+        id: taskId
+      };
+      
+      console.log('Updating with merged data:', { title: updateData.title, status: updateData.status });
+      const response = await tasks.tasks.update({
+        tasklist: taskListId,
+        task: taskId,
+        resource: updateData
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error in updateTask:', error.message);
+      throw error;
+    }
   }
 
   async deleteTask(userId, taskId, taskListId = '@default') {
@@ -69,10 +97,16 @@ class TasksService {
   }
 
   async completeTask(userId, taskId, taskListId = '@default') {
-    return this.updateTask(userId, taskId, { 
-      status: 'completed',
-      completed: new Date().toISOString()
-    }, taskListId);
+    try {
+      console.log('Completing task:', { userId, taskId, taskListId });
+      return this.updateTask(userId, taskId, { 
+        status: 'completed',
+        completed: new Date().toISOString()
+      }, taskListId);
+    } catch (error) {
+      console.error('Error completing task:', error);
+      throw error;
+    }
   }
 }
 

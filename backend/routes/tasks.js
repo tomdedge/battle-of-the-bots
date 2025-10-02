@@ -61,9 +61,12 @@ router.post('/:taskId/complete', async (req, res) => {
   try {
     const { taskId } = req.params;
     const { listId } = req.query;
+    console.log('Complete task route called:', { taskId, listId, userId: req.user.userId });
     const task = await tasksService.completeTask(req.user.userId, taskId, listId);
     res.json(task);
   } catch (error) {
+    console.error('Complete task route error:', error.message);
+    console.error('Full error:', error);
     res.status(500).json({ error: error.message });
   }
 });
