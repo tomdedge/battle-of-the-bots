@@ -33,19 +33,20 @@ class TaskTools {
       },
       {
         name: 'tasks_update_task',
-        description: 'Update an existing task',
+        description: 'Update an existing task by ID or by name. Provide either taskId OR taskName.',
         inputSchema: {
           type: 'object',
           properties: {
             userId: { type: 'string', description: 'User ID' },
-            taskId: { type: 'string', description: 'Task ID' },
-            title: { type: 'string', description: 'Task title' },
+            taskId: { type: 'string', description: 'Task ID (if known)' },
+            taskName: { type: 'string', description: 'Task name/title to search for and update' },
+            title: { type: 'string', description: 'New task title' },
             notes: { type: 'string', description: 'Task notes/description' },
             due: { type: 'string', description: 'Due date (ISO format)' },
             status: { type: 'string', enum: ['needsAction', 'completed'], description: 'Task status' },
             taskListId: { type: 'string', description: 'Task list ID (defaults to @default)' }
           },
-          required: ['userId', 'taskId']
+          required: ['userId']
         }
       },
       {
@@ -126,7 +127,27 @@ class TaskTools {
   }
 
   static async updateTask(args) {
-    const { userId, taskId, taskListId = '@default', ...updateData } = args;
+    const { userId, taskId, taskName, taskListId = '@default', ...updateData } = args;
+    
+    if (!taskId && !taskName) {
+      throw new Error('Either taskId or taskName must be provided');
+    }
+    
+    let finalTaskId = taskId;
+    
+    if (taskName) {
+      // Find task by name first
+      const tasks = await tasksService.getTasks(userId, taskListId);
+      const matchingTask = tasks.find(task => 
+        task.title && task.title.toLowerCase().includes(taskName.toLowerCase())
+      );
+      
+      if (!matchingTask) {
+        throw new Error(`No task found with name containing "${taskName}"`);
+      }
+      
+      finalTaskId = matchingTask.id;
+    }
     
     const taskData = {};
     if (updateData.title) taskData.title = updateData.title;
@@ -134,7 +155,7 @@ class TaskTools {
     if (updateData.due) taskData.due = new Date(updateData.due).toISOString();
     if (updateData.status) taskData.status = updateData.status;
 
-    return await tasksService.updateTask(userId, taskId, taskData, taskListId);
+    return await tasksService.updateTask(userId, finalTaskId, taskData, taskListId);
   }
 
   static async deleteTask(args) {

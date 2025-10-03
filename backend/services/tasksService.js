@@ -144,6 +144,26 @@ class TasksService {
     }
   }
 
+  async updateTaskByName(userId, taskName, taskData, taskListId = '@default') {
+    try {
+      // First, get all tasks to find the one with matching name
+      const allTasks = await this.getTasks(userId, taskListId);
+      const targetTask = allTasks.find(task => 
+        task.title && task.title.toLowerCase() === taskName.toLowerCase()
+      );
+      
+      if (!targetTask) {
+        throw new Error(`Task with name "${taskName}" not found`);
+      }
+      
+      // Update the task using its ID
+      return await this.updateTask(userId, targetTask.id, taskData, taskListId);
+    } catch (error) {
+      console.error('Error in updateTaskByName:', error.message);
+      throw error;
+    }
+  }
+
   async completeTask(userId, taskId, taskListId = '@default') {
     try {
       console.log('Completing task:', { userId, taskId, taskListId });

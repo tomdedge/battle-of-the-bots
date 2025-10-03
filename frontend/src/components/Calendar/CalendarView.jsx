@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ApiService from '../../services/api';
 import { SessionTimer } from '../Session/SessionTimer';
 import { SuggestionConfirmModal } from './SuggestionConfirmModal';
+import { EventDetailModal } from './EventDetailModal';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import './CalendarView.css';
 
@@ -22,6 +23,7 @@ export const CalendarView = () => {
   const [error, setError] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const { token } = useAuth();
 
   useEffect(() => {
@@ -165,8 +167,9 @@ export const CalendarView = () => {
 
   const handleEventClick = (event) => {
     if (event.type === 'suggestion') {
-      // Show confirmation modal for suggestions
       setSelectedSuggestion(event.suggestion);
+    } else {
+      setSelectedEvent(event);
     }
   };
 
@@ -183,6 +186,30 @@ export const CalendarView = () => {
 
   const handleCloseSuggestionModal = () => {
     setSelectedSuggestion(null);
+  };
+
+  const handleUpdateEvent = async (updatedEvent) => {
+    try {
+      const api = new ApiService(token);
+      await api.updateEvent(updatedEvent.id, updatedEvent);
+      await loadCalendarData();
+    } catch (error) {
+      console.error('Failed to update event:', error);
+    }
+  };
+
+  const handleDeleteEvent = async (event) => {
+    try {
+      const api = new ApiService(token);
+      await api.deleteEvent(event.id);
+      await loadCalendarData();
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+    }
+  };
+
+  const handleCloseEventModal = () => {
+    setSelectedEvent(null);
   };
 
   const eventPropGetter = (event) => {
@@ -337,6 +364,14 @@ export const CalendarView = () => {
         opened={!!selectedSuggestion}
         onClose={handleCloseSuggestionModal}
         onSchedule={handleScheduleSuggestion}
+      />
+
+      <EventDetailModal
+        event={selectedEvent}
+        opened={!!selectedEvent}
+        onClose={handleCloseEventModal}
+        onUpdate={handleUpdateEvent}
+        onDelete={handleDeleteEvent}
       />
     </Stack>
   );

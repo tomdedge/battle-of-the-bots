@@ -87,4 +87,35 @@ router.post('/focus-block', async (req, res) => {
   }
 });
 
+router.put('/events/:eventId', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const updateData = {
+      title: req.body.title,
+      description: req.body.description,
+      startDateTime: req.body.start?.dateTime || req.body.start,
+      endDateTime: req.body.end?.dateTime || req.body.end
+    };
+    
+    console.log('Updating event:', eventId, updateData);
+    const event = await calendarService.updateEvent(req.user.userId, eventId, updateData);
+    res.json(event);
+  } catch (error) {
+    console.error('Event update error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/events/:eventId', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    console.log('Deleting event:', eventId);
+    await calendarService.deleteEvent(req.user.userId, eventId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Event deletion error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

@@ -113,6 +113,36 @@ export const useSocket = () => {
     }
   };
 
+  const sendTaskMessage = (message, callback) => {
+    if (isAuthenticated && socket && socket.connected) {
+      // Send message using separate event that doesn't store in chat history
+      socket.emit('task_message', { message, model: selectedModel });
+      
+      // Set up one-time listener for task response
+      const handleTaskResponse = (response) => {
+        callback(response);
+        socket.off('task_response', handleTaskResponse);
+      };
+      
+      socket.on('task_response', handleTaskResponse);
+    }
+  };
+
+  const sendAuroraMessage = (message) => {
+    if (isAuthenticated && socket && socket.connected) {
+      // Add Aurora's message directly to chat history without user message
+      const auroraMessage = {
+        message: '', // No user message
+        response: message, // Aurora's message as response
+        model: selectedModel,
+        timestamp: new Date().toISOString(),
+        pending: false
+      };
+      
+      setChatHistory(prev => [...prev, auroraMessage]);
+    }
+  };
+
   const onAIResponse = (callback) => {
     if (socket) {
       socket.on('ai_response', callback);
@@ -157,6 +187,8 @@ export const useSocket = () => {
   return { 
     isConnected: isConnected && isAuthenticated, 
     sendMessage, 
+    sendTaskMessage,
+    sendAuroraMessage,
     onAIResponse, 
     models, 
     selectedModel, 

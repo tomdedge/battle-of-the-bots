@@ -92,6 +92,30 @@ class ApiService {
     return response.json();
   }
 
+  async updateEvent(eventId, eventData) {
+    const response = await fetch(`${this.baseURL}/api/calendar/events/${eventId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(eventData)
+    });
+    
+    this.clearSuggestionCache();
+    return response.json();
+  }
+
+  async deleteEvent(eventId) {
+    const response = await fetch(`${this.baseURL}/api/calendar/events/${eventId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    
+    this.clearSuggestionCache();
+    return response.json();
+  }
+
   clearSuggestionCache() {
     // Clear all suggestion cache entries
     const keys = Object.keys(localStorage);
@@ -140,6 +164,15 @@ class ApiService {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(taskData)
+    });
+    return response.json();
+  }
+
+  async deleteTask(taskId, listId) {
+    const url = listId ? `${this.baseURL}/api/tasks/${taskId}?listId=${listId}` : `${this.baseURL}/api/tasks/${taskId}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${this.token}` }
     });
     return response.json();
   }

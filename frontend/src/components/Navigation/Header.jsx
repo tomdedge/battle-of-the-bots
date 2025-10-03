@@ -134,7 +134,12 @@ export function Header() {
             <Button variant="default" onClick={closeConfirm}>
               Cancel
             </Button>
-            <Button color="red" onClick={handleClearChat}>
+            <Button 
+              color="red" 
+              variant="filled" 
+              onClick={handleClearChat}
+              style={{ backgroundColor: '#dc2626', color: 'white' }}
+            >
               Clear All
             </Button>
           </Group>

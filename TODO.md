@@ -27,8 +27,6 @@ TODO:
 when session is active. Track session time in database to provide analytics on total time in focus session
 per day/week/month and to allow AI to analyze trends to display them on a dashboard and to be better at
 suggesting focus times in the future.
-- persist the users active tab across refreshes.
-- cache suggestions for different views to prevent unnecessary calls to the analyze endpoint.
 - button on tasks tab to 'schedule all tasks' and a button for each task to 'schedule task' that will ask Aurora (AI Agent) to find a time in the calendar and schedule the task as an event of the same title. Instruct aurora to default to 30 min duration (suggest other defaults) unless a more appropriate alternative to the default is apparent from the task. Once Aurora has scheduled the task, have her update the task title to include a [Scheduled] tag, then show her response to the user in a modal. The modal should show her Avatar next to a speech bubble with her real response. Construct the prompt to facilitate this desired outcome as best as possible.
 
 ## 🎯 Core Product Vision (From Spec)

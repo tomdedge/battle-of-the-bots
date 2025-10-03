@@ -80,6 +80,117 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Verification function to check Aurora's work and assist with completion
+async function verifyTaskScheduling(userId, originalMessage, aiResponse) {
+  try {
+    // Extract task name from the original message
+    const taskMatch = originalMessage.match(/Task to schedule: "([^"]+)"/);
+    if (!taskMatch) return;
+    
+    const taskName = taskMatch[1];
+    console.log(`🔍 Verifying task scheduling for: "${taskName}"`);
+    
+    // Get today's calendar events to check Aurora's work
+    const calendarService = require('./services/calendarService');
+    const tasksService = require('./services/tasksService');
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    
+    const events = await calendarService.getEvents(userId, startOfDay.toISOString(), endOfDay.toISOString());
+    
+    // Check if Aurora created the calendar event
+    const scheduledEvent = events.find(event => 
+      event.summary && event.summary.toLowerCase().includes(taskName.toLowerCase())
+    );
+    
+    let eventCreated = !!scheduledEvent;
+    let taskUpdated = false;
+    
+    // Check if Aurora updated the task title
+    try {
+      const allTasks = await tasksService.getTasks(userId);
+      const targetTask = allTasks.find(task => 
+        task.title && (
+          task.title.toLowerCase() === `[scheduled] ${taskName.toLowerCase()}` ||
+          task.title.toLowerCase() === taskName.toLowerCase()
+        )
+      );
+      taskUpdated = targetTask && targetTask.title.toLowerCase().includes('[scheduled]');
+    } catch (taskCheckError) {
+      console.log(`⚠️  Could not check task status: ${taskCheckError.message}`);
+    }
+    
+    console.log(`📊 Aurora's performance: Event created: ${eventCreated}, Task updated: ${taskUpdated}`);
+    
+    // If Aurora didn't create the event, help her out
+    if (!eventCreated) {
+      console.log(`🤖 Aurora didn't create calendar event, assisting...`);
+      
+      // Find next available 30-minute slot (Aurora's logic would be smarter, but this is our fallback)
+      const now = new Date();
+      let startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0); // Default to 9 AM
+      
+      // If it's already past 9 AM, start from current time rounded up to next 30-min interval
+      if (now > startTime) {
+        const minutes = now.getMinutes();
+        const roundedMinutes = Math.ceil(minutes / 30) * 30;
+        startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), roundedMinutes);
+        if (roundedMinutes >= 60) {
+          startTime.setHours(startTime.getHours() + 1, 0);
+        }
+      }
+      
+      const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+      
+      try {
+        const eventData = {
+          summary: taskName,
+          start: { dateTime: startTime.toISOString() },
+          end: { dateTime: endTime.toISOString() },
+          description: `Task scheduled with Aurora's assistance`
+        };
+        
+        await calendarService.createEvent(userId, eventData);
+        console.log(`✅ Assisted Aurora by creating calendar event: "${taskName}" at ${startTime.toLocaleTimeString()}`);
+        eventCreated = true;
+      } catch (calendarError) {
+        console.log(`❌ Failed to assist with calendar event: ${calendarError.message}`);
+      }
+    } else {
+      console.log(`✅ Aurora successfully created calendar event: "${scheduledEvent.summary}"`);
+    }
+    
+    // If Aurora didn't update the task title, help her out
+    if (eventCreated && !taskUpdated) {
+      console.log(`🤖 Aurora didn't update task title, assisting...`);
+      try {
+        await tasksService.updateTaskByName(userId, taskName, {
+          title: `[Scheduled] ${taskName}`
+        });
+        console.log(`✅ Assisted Aurora by updating task title to: "[Scheduled] ${taskName}"`);
+        taskUpdated = true;
+      } catch (taskError) {
+        console.log(`❌ Failed to assist with task update: ${taskError.message}`);
+      }
+    } else if (taskUpdated) {
+      console.log(`✅ Aurora successfully updated task title`);
+    }
+    
+    // Log final status
+    if (eventCreated && taskUpdated) {
+      console.log(`🎉 Task scheduling completed successfully (Aurora + assistance)`);
+    } else if (eventCreated) {
+      console.log(`⚠️  Partial success: Event created but task not updated`);
+    } else {
+      console.log(`❌ Task scheduling failed completely`);
+    }
+    
+  } catch (error) {
+    console.error('❌ Task verification error:', error.message);
+  }
+}
+
 // Socket.io authentication middleware
 io.use(authenticateSocket);
 
@@ -168,11 +279,42 @@ io.on('connection', async (socket) => {
         sessionId
       });
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('Chat message error:', error);
       socket.emit('ai_response', {
-        message: "I'm having trouble connecting right now. Please try again.",
+        message: 'Sorry, I encountered an error processing your message.',
         timestamp: new Date().toISOString(),
-        error: true
+        userId: socket.user.userId,
+        sessionId
+      });
+    }
+  });
+
+  // Separate event for task scheduling that doesn't store in chat history
+  socket.on('task_message', async (data) => {
+    try {
+      const { message, model } = data;
+      const userId = socket.user.userId;
+      
+      // Send to LiteLLM with user context and session ID, skip history storage
+      const aiResponse = await aiService.sendMessage(message, model, userId, sessionId, true);
+      
+      // Verify if Aurora actually scheduled the task
+      await verifyTaskScheduling(userId, message, aiResponse);
+      
+      // Send response back to client with different event name
+      socket.emit('task_response', {
+        message: aiResponse,
+        timestamp: new Date().toISOString(),
+        userId,
+        sessionId
+      });
+    } catch (error) {
+      console.error('Task message error:', error);
+      socket.emit('task_response', {
+        message: 'Sorry, I encountered an error processing your task.',
+        timestamp: new Date().toISOString(),
+        userId: socket.user.userId,
+        sessionId
       });
     }
   });

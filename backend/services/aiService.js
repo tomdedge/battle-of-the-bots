@@ -63,7 +63,7 @@ class AIService {
     return `Tool Error: ${message}`;
   }
 
-  async sendMessage(message, model, userId = null, sessionId = null) {
+  async sendMessage(message, model, userId = null, sessionId = null, skipHistory = false) {
     if (!model) {
       model = this.getDefaultModel();
       if (!model) {
@@ -333,8 +333,8 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         console.log(`🤖 LLM RESPONSE (${userId}):`, finalResponse);
       }
 
-      // Save chat message to database if user is authenticated
-      if (userId) {
+      // Save chat message to database if user is authenticated and not skipping history
+      if (userId && !skipHistory) {
         try {
           await dbService.saveChatMessage(userId, message, finalResponse, model, sessionId);
         } catch (dbError) {

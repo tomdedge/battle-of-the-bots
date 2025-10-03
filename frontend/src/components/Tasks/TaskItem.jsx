@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Card, Text, Group, ActionIcon, Checkbox, Menu, TextInput, Button } from '@mantine/core';
-import { IconDots, IconEdit, IconTrash, IconCheck, IconX } from '@tabler/icons-react';
+import { IconDots, IconEdit, IconTrash, IconCheck, IconX, IconCalendarPlus } from '@tabler/icons-react';
 import moment from 'moment';
 
-export const TaskItem = ({ task, onComplete, onDelete, onUpdate }) => {
+export const TaskItem = ({ task, onComplete, onDelete, onUpdate, onSchedule }) => {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title || '');
 
@@ -109,6 +109,14 @@ export const TaskItem = ({ task, onComplete, onDelete, onUpdate }) => {
             </Menu.Target>
 
             <Menu.Dropdown>
+              {!isCompleted && !task.title?.includes('[Scheduled]') && onSchedule && (
+                <Menu.Item
+                  leftSection={<IconCalendarPlus size={14} />}
+                  onClick={() => onSchedule(task)}
+                >
+                  Schedule
+                </Menu.Item>
+              )}
               {!isCompleted && (
                 <Menu.Item
                   leftSection={<IconEdit size={14} />}

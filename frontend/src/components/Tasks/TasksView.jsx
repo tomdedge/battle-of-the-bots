@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Stack, Paper, LoadingOverlay, Text, Button, Group, Select, ScrollArea, Box } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { IconPlus, IconCalendarPlus } from '@tabler/icons-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../hooks/useSocket';
 import ApiService from '../../services/api';
 import { TaskItem } from './TaskItem';
 import { TaskForm } from './TaskForm';
+import { AuroraResponseModal } from './AuroraResponseModal';
 
 export const TasksView = () => {
   const [tasks, setTasks] = useState([]);
@@ -12,7 +14,9 @@ export const TasksView = () => {
   const [selectedListId, setSelectedListId] = useState('@default');
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [auroraModal, setAuroraModal] = useState({ opened: false, response: '', isLoading: false });
   const { token } = useAuth();
+  const { sendTaskMessage, sendAuroraMessage } = useSocket();
 
   useEffect(() => {
     if (token) {
@@ -90,6 +94,207 @@ export const TasksView = () => {
     }
   };
 
+  const scheduleTask = async (task) => {
+    setAuroraModal({ opened: true, response: '', isLoading: true });
+    
+    try {
+      // Pre-fetch calendar data to give Aurora context
+      const api = new ApiService(token);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      
+      const eventsResponse = await api.getCalendarEvents(
+        today.toISOString(), 
+        tomorrow.toISOString()
+      );
+      
+      const events = eventsResponse.events || [];
+      const eventSummary = events.length === 0 
+        ? "Your calendar is completely free today."
+        : `Your calendar today has ${events.length} events:\n${events.map(event => {
+            const start = new Date(event.start.dateTime || event.start.date);
+            const end = new Date(event.end.dateTime || event.end.date);
+            return `- ${event.summary}: ${start.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true})} to ${end.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true})}`;
+          }).join('\n')}`;
+
+      // Create focused prompt with calendar context
+      const prompt = `CALENDAR CONTEXT:
+${eventSummary}
+
+TASK TO SCHEDULE: "${task.title}"
+${task.notes ? `Notes: ${task.notes}` : ''}
+${task.due ? `Due date: ${task.due}` : ''}
+
+YOUR JOB: Use calendar_create_event to schedule this task as a 30-minute event.
+- Find the best available time slot based on the calendar above
+- Use the exact task title: "${task.title}"
+- Format: {"summary": "${task.title}", "start": {"dateTime": "2025-10-03T09:30:00-06:00"}, "end": {"dateTime": "2025-10-03T10:00:00-06:00"}}
+
+Execute calendar_create_event now with your chosen time slot.`;
+
+      // Set up response handler
+      const handleResponse = async (responseData) => {
+        const message = typeof responseData === 'string' ? responseData : responseData?.message || 'Task scheduled!';
+        
+        console.log('Task scheduling response received:', message);
+        
+        // Check if Aurora created the calendar event
+        let eventWasCreated = false;
+        try {
+          const updatedEventsResponse = await api.getCalendarEvents(
+            today.toISOString(), 
+            tomorrow.toISOString()
+          );
+          
+          const taskEvent = updatedEventsResponse.events?.find(event => 
+            event.summary === task.title || event.summary?.includes(task.title)
+          );
+          
+          eventWasCreated = !!taskEvent;
+          
+          if (eventWasCreated) {
+            console.log('✅ Aurora successfully created calendar event');
+            
+            // Update task title ourselves
+            try {
+              await api.updateTask(task.id, { title: `[Scheduled] ${task.title}` }, selectedListId);
+              console.log('✅ Updated task title with [Scheduled] tag');
+            } catch (updateError) {
+              console.error('Failed to update task title:', updateError);
+            }
+            
+            // Show Aurora's success response
+            setAuroraModal({ 
+              opened: true, 
+              response: message, 
+              isLoading: false 
+            });
+          } else {
+            console.log('❌ Aurora did not create calendar event');
+            
+            // Aurora failed - escalate to main chat
+            const followUpMessage = `I had trouble scheduling your task "${task.title}". Here are the details:
+
+Task: ${task.title}
+${task.notes ? `Notes: ${task.notes}` : ''}
+${task.due ? `Due date: ${task.due}` : ''}
+
+Calendar context:
+${eventSummary}
+
+Let's work together to find the perfect time for this task. What time would work best for you?`;
+
+            if (sendAuroraMessage) {
+              console.log('Sending Aurora follow-up message to main chat');
+              sendAuroraMessage(followUpMessage);
+            }
+            
+            // Show failure response with promise to follow up
+            setAuroraModal({ 
+              opened: true, 
+              response: `${message}\n\nI'll follow up with you in the main chat to help find the perfect time for this task.`, 
+              isLoading: false 
+            });
+          }
+        } catch (verificationError) {
+          console.error('Failed to verify task scheduling:', verificationError);
+          setAuroraModal({ 
+            opened: true, 
+            response: message, 
+            isLoading: false 
+          });
+        }
+        
+        // Refresh tasks to show any [Scheduled] tags
+        setTimeout(() => loadTasks(), 1000);
+      };
+
+      // Send message via socket
+      sendTaskMessage(prompt, handleResponse);
+      
+    } catch (error) {
+      console.error('Failed to prepare task scheduling:', error);
+      setAuroraModal({ 
+        opened: true, 
+        response: 'Sorry, I had trouble accessing your calendar. Please try again.', 
+        isLoading: false 
+      });
+    }
+  };
+
+  const scheduleAllTasks = async () => {
+    const unscheduledTasks = incompleteTasks.filter(task => !task.title?.includes('[Scheduled]'));
+    
+    if (unscheduledTasks.length === 0) {
+      setAuroraModal({ 
+        opened: true, 
+        response: 'All your tasks are already scheduled!', 
+        isLoading: false 
+      });
+      return;
+    }
+
+    setAuroraModal({ opened: true, response: '', isLoading: true });
+    
+    const taskList = unscheduledTasks.map(task => 
+      `- ${task.title}${task.notes ? ` (${task.notes})` : ''}`
+    ).join('\n');
+    
+    const prompt = `I need you to schedule all of these tasks in my calendar right now:
+
+${taskList}
+
+CRITICAL INSTRUCTIONS - Execute these steps in order and DO NOT respond until ALL steps are complete:
+
+1. Use calendar_get_events to check my current calendar
+2. For each task, find appropriate time slots (30 minutes each unless clearly more/less time is needed)
+3. Use calendar_create_event for each task with their exact titles
+4. Use tasks_update_task to add [Scheduled] to the beginning of each task title
+5. ONLY AFTER all tools have executed successfully, respond with a summary: "Successfully scheduled all ${unscheduledTasks.length} tasks: [list with times]"
+
+If ANY step fails, respond with: "I had trouble scheduling some tasks. Let's work on this together in the main chat - I'll send you the details there."
+
+DO NOT respond with any message until you have completed ALL the tool calls for ALL tasks. Execute all the tools first, then respond based on the results.`;
+
+    // Set up one-time listener for AI response
+    const handleResponse = (responseData) => {
+      // Extract message from response object
+      const message = typeof responseData === 'string' ? responseData : responseData?.message || `Scheduled ${unscheduledTasks.length} tasks successfully!`;
+      
+      // Check if Aurora had trouble scheduling tasks (more flexible matching)
+      if (message.includes("trouble scheduling") || message.includes("Let's work on this together")) {
+        // Send follow-up message to main chat
+        const taskList = unscheduledTasks.map(task => 
+          `- ${task.title}${task.notes ? ` (${task.notes})` : ''}`
+        ).join('\n');
+        
+        const followUpMessage = `I had trouble scheduling some of your tasks. Here's what I was trying to schedule:
+
+${taskList}
+
+Let's work together to find good times for these tasks. Would you like me to try scheduling them one by one, or do you have specific time preferences?`;
+
+        // Send to main chat as Aurora message
+        if (sendAuroraMessage) {
+          sendAuroraMessage(followUpMessage);
+        }
+      }
+      
+      setAuroraModal({ 
+        opened: true, 
+        response: message, 
+        isLoading: false 
+      });
+      
+      // Refresh tasks to show [Scheduled] tags
+      loadTasks();
+    };
+
+    // Send message via socket without storing in chat history
+    sendTaskMessage(prompt, handleResponse);
+  };
+
   const incompleteTasks = tasks.filter(task => task.status !== 'completed');
   const completedTasks = tasks.filter(task => task.status === 'completed');
 
@@ -117,12 +322,22 @@ export const TasksView = () => {
               }))}
               style={{ flex: 1 }}
             />
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={() => setShowForm(true)}
-            >
-              Add Task
-            </Button>
+            <Group gap="sm">
+              <Button
+                leftSection={<IconCalendarPlus size={16} />}
+                onClick={scheduleAllTasks}
+                variant="light"
+                disabled={incompleteTasks.filter(task => !task.title?.includes('[Scheduled]')).length === 0}
+              >
+                Schedule All
+              </Button>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                onClick={() => setShowForm(true)}
+              >
+                Add Task
+              </Button>
+            </Group>
           </Group>
         </Paper>
       </Box>
@@ -149,6 +364,7 @@ export const TasksView = () => {
                   onComplete={() => handleTaskComplete(task.id)}
                   onDelete={() => handleTaskDelete(task.id)}
                   onUpdate={(data) => handleTaskUpdate(task.id, data)}
+                  onSchedule={scheduleTask}
                 />
               ))}
             </Stack>
@@ -176,6 +392,13 @@ export const TasksView = () => {
           </Stack>
         </Paper>
       </ScrollArea>
+
+      <AuroraResponseModal
+        opened={auroraModal.opened}
+        onClose={() => setAuroraModal({ opened: false, response: '', isLoading: false })}
+        response={auroraModal.response}
+        isLoading={auroraModal.isLoading}
+      />
     </Stack>
   );
 };

@@ -100,7 +100,22 @@ class CalendarTools {
 
   static async getEvents(args) {
     const { userId, startDate, endDate } = args;
-    return await calendarService.getEvents(userId, startDate, endDate);
+    
+    // Normalize date formats - convert date-only strings to full ISO datetime
+    let normalizedStartDate = startDate;
+    let normalizedEndDate = endDate;
+    
+    if (startDate && !startDate.includes('T')) {
+      // Convert YYYY-MM-DD to start of day ISO datetime
+      normalizedStartDate = new Date(startDate + 'T00:00:00').toISOString();
+    }
+    
+    if (endDate && !endDate.includes('T')) {
+      // Convert YYYY-MM-DD to end of day ISO datetime
+      normalizedEndDate = new Date(endDate + 'T23:59:59').toISOString();
+    }
+    
+    return await calendarService.getEvents(userId, normalizedStartDate, normalizedEndDate);
   }
 
   static async updateEvent(args) {

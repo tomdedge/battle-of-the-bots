@@ -17,6 +17,18 @@ export const theme = createTheme({
       '#DA7576', // 7
       '#854B58', // 8
       '#2D1B21'  // 9 - very dark for high contrast
+    ],
+    red: [
+      '#ffebee',
+      '#ffcdd2', 
+      '#ef9a9a',
+      '#e57373',
+      '#ef5350',
+      '#f44336', // 5 - main red
+      '#e53935',
+      '#d32f2f',
+      '#c62828',
+      '#b71c1c'
     ]
   },
   primaryColor: 'aura',
