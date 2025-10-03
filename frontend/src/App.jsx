@@ -171,13 +171,16 @@ function MainApp() {
       <AppShell.Main style={{ 
         height: 'calc(100vh - 60px)',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}>
         <div style={{ 
           flex: 1, 
           display: 'flex', 
           flexDirection: 'column',
-          paddingBottom: '60px'
+          paddingBottom: '60px',
+          overflow: 'hidden',
+          minHeight: 0
         }}>
           {renderContent()}
         </div>

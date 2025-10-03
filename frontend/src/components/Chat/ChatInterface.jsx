@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Stack, ScrollArea, Text, Loader, Center } from '@mantine/core';
+import { Stack, ScrollArea, Text, Loader, Center, Box } from '@mantine/core';
 import { useSocket } from '../../hooks/useSocket';
 import { useAuth } from '../../contexts/AuthContext';
 import { MessageBubble } from './MessageBubble';
@@ -97,8 +97,26 @@ export const ChatInterface = () => {
   const canRegenerate = latestMessage && !latestMessage.isUser;
 
   return (
-    <Stack h="100%" gap={0} style={{ display: 'flex', flexDirection: 'column' }}>
-      <ScrollArea style={{ flex: 1 }} px="md" pt="md" ref={scrollAreaRef}>
+    <Stack 
+      h="100%" 
+      gap={0} 
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        backgroundColor: 'var(--mantine-color-body)',
+        overflow: 'hidden'
+      }}
+    >
+      <ScrollArea 
+        h={0}
+        style={{ flex: 1 }} 
+        px="md" 
+        pt="md" 
+        ref={scrollAreaRef}
+        viewportProps={{
+          style: { backgroundColor: 'var(--mantine-color-body)' }
+        }}
+      >
         {messages.length === 0 ? (
           <Center h="100%">
             <Stack align="center" gap="xs">
@@ -124,24 +142,22 @@ export const ChatInterface = () => {
         )}
       </ScrollArea>
       
-      <Stack 
+      <Box 
         p="md" 
-        gap="xs" 
         style={{ 
           flexShrink: 0,
           backgroundColor: 'var(--mantine-color-body)',
-          borderTop: '1px solid var(--mantine-color-gray-3)',
-          paddingBottom: 'calc(60px + var(--mantine-spacing-md))'
+          borderTop: '1px solid var(--mantine-color-gray-3)'
         }}
       >
         {!isConnected && (
-          <Text size="xs" c="red">Connecting...</Text>
+          <Text size="xs" c="red" mb="xs">Connecting...</Text>
         )}
         <ChatInput 
           onSendMessage={handleSendMessage}
           disabled={!isConnected || isLoading}
         />
-      </Stack>
+      </Box>
     </Stack>
   );
 };
