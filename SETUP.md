@@ -1,45 +1,25 @@
 # AuraFlow Setup Guide
 
-## Database Migration (New Message System)
+## For New Developers
 
-### Overview
-AuraFlow has been upgraded to use a new flexible message system that supports:
+Follow the [README.md](README.md) for initial setup.
+
+## For Existing Users
+
+If you have an existing installation, see [MIGRATION.md](MIGRATION.md) for upgrade instructions.
+
+## Development Setup
+
+### Database Schema Overview
+AuraFlow uses a flexible message system that supports:
 - Individual message storage (no forced user/aurora pairing)
 - Aurora-initiated conversations
 - Multi-message sequences
 - Future conversation threading
 
-### Migration Steps
-
-#### 1. Run Database Migration
-```bash
-cd backend
-npm run migrate
-```
-
-This creates the new `messages` table alongside the existing `chat_messages` table.
-
-#### 2. Verify Migration
-```bash
-npm run test-messages
-```
-
-Should output:
-```
-🧪 Testing new message methods...
-✅ User message saved: [id] [content]
-✅ Aurora message saved: [id] [content]
-✅ Messages retrieved: 2
-✅ Converted to chat history: 1 entries
-✅ Test cleanup completed
-🎉 All tests passed!
-```
-
-### What Changed
-
-#### Database Schema
-**New Table: `messages`**
+### Key Tables
 ```sql
+-- New flexible message system
 CREATE TABLE messages (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -51,111 +31,99 @@ CREATE TABLE messages (
   conversation_id UUID DEFAULT gen_random_uuid(),
   reply_to_id INTEGER REFERENCES messages(id)
 );
-```
 
-**Old Table: `chat_messages` (still exists for compatibility)**
-```sql
+-- Legacy table (still supported)
 CREATE TABLE chat_messages (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  message TEXT NOT NULL,     -- User message (forced pairing)
-  response TEXT NOT NULL,    -- Aurora response (forced pairing)
+  message TEXT NOT NULL,
+  response TEXT NOT NULL,
   model VARCHAR(100) NOT NULL,
   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   session_id VARCHAR(255)
 );
 ```
 
-#### Backend Changes
+### API Changes
 - **New Methods**: `saveMessage()`, `getMessages()`, `deleteMessage()`, `clearMessages()`
 - **Socket Events**: `messages` (instead of `chat_history`), `messages_cleared`
 - **API Endpoints**: `/auth/messages/:messageId` for deletion
-- **inject_aurora_message**: Now uses new table for proper storage
-
-#### Frontend Changes
-- **useSocket**: Uses `messages` array instead of `chatHistory`
-- **ChatInterface**: Direct message display (no conversion needed)
 - **Message Format**: `{id, content, sender, timestamp, model}`
 
-### Current System Status
+### Frontend Changes
+- **useSocket**: Uses `messages` array instead of `chatHistory`
+- **ChatInterface**: Direct message display (no conversion needed)
+- **Aurora Follow-ups**: Properly stored and displayed in main chat
 
-#### ✅ Working Features
-- Regular chat conversations
-- Aurora injected messages (task scheduling follow-ups)
-- Message deletion
-- Task scheduling with proper success detection
-- Multi-message conversations
-
-#### 🔄 Backward Compatibility
-- Old `chat_messages` table still exists
-- Conversion helper available: `convertMessagesToChatHistory()`
-- Old API endpoints still functional
-
-### Development Commands
+## Development Commands
 
 ```bash
-# Run migration
-npm run migrate
+# Install dependencies
+npm run install-all
 
-# Test new message system
+# Start development server
+npm run dev
+
+# Run database migration
+cd backend && npm run migrate
+
+# Test message system
 npm run test-messages
 
 # Test integration
 node test_integration.js
 
+# Build for production
+npm run build
+```
+
+## Testing
+
+### Message System Tests
+```bash
+# Test new message methods
+npm run test-messages
+
 # Test task scheduling follow-up
 node test_task_followup.js
 
-# Start development server
-npm run dev
+# Integration test
+node test_integration.js
 ```
 
-### Troubleshooting
+### Manual Testing
+1. Start the app: `npm start`
+2. Create a task and ask Aurora to schedule it
+3. Verify follow-up message appears in main chat
+4. Test message deletion functionality
+5. Test chat history persistence
 
-#### Migration Issues
+## Troubleshooting
+
+### Database Issues
 ```bash
 # Check if messages table exists
-psql $DATABASE_URL -c "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'messages');"
+psql $DATABASE_URL -c "\dt messages"
 
-# Manual migration (if needed)
-psql $DATABASE_URL -f db/migrations/001_add_messages_table.sql
+# Verify migration ran successfully
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'messages';"
 ```
 
-#### Frontend Issues
-```bash
-# Clear browser cache and restart
-# Check console for errors
-# Verify socket connection in Network tab
-```
+### Frontend Issues
+- Clear browser cache and restart
+- Check console for WebSocket connection errors
+- Verify API endpoints are responding
 
-### Future Capabilities Enabled
+### Performance
+- Message queries are optimized with indexes
+- Old chat_messages table can be dropped after migration verification
+- Consider pagination for large message histories
 
-With the new message system, Aurora can now:
-- **Ask clarifying questions**: "What time would work best for this task?"
-- **Send proactive messages**: "I noticed you have unscheduled tasks..."
-- **Multi-turn conversations**: Natural back-and-forth about scheduling
-- **Conversation threading**: Reply to specific messages (future feature)
-- **Rich messaging**: Support for different message types (future feature)
+## Future Enhancements
 
-### Migration Safety
-
-#### Development Environment
-- ✅ Safe to run migration (no data loss concerns)
-- ✅ Both old and new systems coexist
-- ✅ Easy rollback by dropping new table
-
-#### Production Environment (Future)
-- Backup database before migration
-- Test migration on copy first
-- Monitor performance after deployment
-- Keep old table for rollback capability
-
-### Next Steps
-
-1. **Test the new system** with task scheduling
-2. **Verify follow-up messages** appear in main chat
-3. **Implement Phase 4** (cleanup and advanced features)
-4. **Add conversation threading** (future enhancement)
-5. **Add proactive Aurora features** (future enhancement)
-
-The new message system provides a solid foundation for natural AI conversations and advanced features!
+The new message system enables:
+- **Conversation threading**: Reply to specific messages
+- **Proactive Aurora**: Morning briefings, reminders
+- **Rich messages**: Different message types and attachments
+- **Multi-turn scheduling**: Natural back-and-forth conversations
+- **Context awareness**: Aurora remembers conversation context
