@@ -301,11 +301,16 @@ DO NOT respond with any message until you have completed ALL the tool calls for 
 
     // Set up one-time listener for AI response
     const handleResponse = (responseData) => {
-      // Extract message from response object
-      const message = typeof responseData === 'string' ? responseData : responseData?.message || `Scheduled ${unscheduledTasks.length} tasks successfully!`;
+      // Extract message from nested response object
+      const message = typeof responseData === 'string' 
+        ? responseData 
+        : responseData?.message?.message || responseData?.message || `Scheduled ${unscheduledTasks.length} tasks successfully!`;
+      
+      console.log('🔍 Final extracted message:', message);
+      console.log('🔍 Final message type:', typeof message);
       
       // Check if Aurora had trouble scheduling tasks (more flexible matching)
-      if (message.includes("trouble scheduling") || message.includes("Let's work on this together")) {
+      if (typeof message === 'string' && (message.includes("trouble scheduling") || message.includes("Let's work on this together") || message.includes("scheduling issue"))) {
         // Send follow-up message to main chat
         const taskList = unscheduledTasks.map(task => 
           `- ${task.title}${task.notes ? ` (${task.notes})` : ''}`
