@@ -29,9 +29,21 @@ class AIService {
     const result = await response.json();
     this.cachedModels = result;
     
-    // Cache the first available model as default
+    // Cache a suitable chat model as default - prefer llama-3.1-8b-instant for tool support
     if (result.data && result.data.length > 0) {
-      this.defaultModel = result.data[0].id;
+      // First try to find llama-3.1-8b-instant specifically (supports tools)
+      const preferredModel = result.data.find(model => model.id === 'llama-3.1-8b-instant');
+      if (preferredModel) {
+        this.defaultModel = preferredModel.id;
+      } else {
+        // Fallback to other llama models that support tools
+        const chatModel = result.data.find(model => 
+          model.id.includes('llama') || 
+          model.id.includes('mixtral') || 
+          model.id.includes('gemma')
+        );
+        this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
+      }
     }
     
     return result;
