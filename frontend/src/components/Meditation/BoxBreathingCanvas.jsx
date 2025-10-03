@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Container, Title, Text, Stack, ScrollArea, useMantineColorScheme } from '@mantine/core';
+import { Container, Title, Text, Stack, ScrollArea, useMantineColorScheme, ActionIcon, Group } from '@mantine/core';
+import { IconArrowLeft } from '@tabler/icons-react';
 
-export function BoxBreathingCanvas() {
+export function BoxBreathingCanvas({ onBack }) {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
   const [isActive, setIsActive] = useState(false);
@@ -210,6 +211,18 @@ export function BoxBreathingCanvas() {
         onClick={toggleBreathing}
       >
         <Stack align="center" justify="center" gap="xl" style={{ height: '100%' }}>
+          {onBack && (
+            <Group justify="flex-start" style={{ width: '100%', position: 'absolute', top: 20, left: 20, zIndex: 10 }}>
+              <ActionIcon
+                onClick={onBack}
+                variant="subtle"
+                size="lg"
+                style={{ backgroundColor: 'rgba(0,0,0,0.3)', color: 'white' }}
+              >
+                <IconArrowLeft size={20} />
+              </ActionIcon>
+            </Group>
+          )}
           <div 
             style={{ 
               position: 'relative',
