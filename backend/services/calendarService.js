@@ -98,16 +98,35 @@ class CalendarService {
 
   async analyzeCalendarGaps(userId, date = new Date()) {
     const now = new Date();
-    const startOfDay = new Date(date);
-    const endOfDay = new Date(date);
+    const requestedDate = new Date(date);
+    
+    // Don't analyze dates that are entirely in the past
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const requestedDateStart = new Date(requestedDate);
+    requestedDateStart.setHours(0, 0, 0, 0);
+    
+    if (requestedDateStart < todayStart) {
+      console.log('Requested date is in the past, skipping analysis');
+      return [];
+    }
+    
+    const startOfDay = new Date(requestedDate);
+    const endOfDay = new Date(requestedDate);
     
     // Expand time window: 7 AM - 9 PM
     startOfDay.setHours(7, 0, 0, 0);
     endOfDay.setHours(21, 0, 0, 0);
     
-    // If analyzing today, start from current time if it's later than 7 AM
-    if (date.toDateString() === now.toDateString() && now > startOfDay) {
+    // Always start from current time or later to avoid suggesting past times
+    if (startOfDay < now) {
       startOfDay.setTime(now.getTime());
+    }
+    
+    // Don't analyze if the entire day has passed
+    if (startOfDay >= endOfDay) {
+      console.log('No future time available for gap analysis');
+      return [];
     }
 
     console.log('Analyzing calendar gaps:', {
@@ -125,8 +144,11 @@ class CalendarService {
     console.log(`Found ${gaps.length} potential gaps`);
     
     // Reduce minimum duration to 15 minutes for more suggestions
-    const filteredGaps = gaps.filter(gap => gap.duration >= 15);
-    console.log(`${filteredGaps.length} gaps meet minimum duration (15 min)`);
+    // Filter gaps by minimum duration and ensure they're in the future
+    const filteredGaps = gaps.filter(gap => {
+      return gap.duration >= 15 && gap.start >= now;
+    });
+    console.log(`${filteredGaps.length} gaps meet minimum duration (15 min) and are in the future`);
     
     return filteredGaps;
   }

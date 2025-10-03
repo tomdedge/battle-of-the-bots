@@ -43,6 +43,17 @@ router.get('/analyze', async (req, res) => {
       const currentDate = new Date(baseDate);
       currentDate.setDate(baseDate.getDate() + i);
       
+      // Skip past dates entirely
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const checkDate = new Date(currentDate);
+      checkDate.setHours(0, 0, 0, 0);
+      
+      if (checkDate < today) {
+        console.log(`Skipping past date: ${currentDate.toDateString()}`);
+        continue;
+      }
+      
       console.log(`Analyzing ${currentDate.toDateString()}`);
       
       const gaps = await calendarService.analyzeCalendarGaps(req.user.userId, currentDate);
