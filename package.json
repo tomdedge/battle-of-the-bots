@@ -14,8 +14,10 @@
     "migrate": "cd backend && npm run migrate",
     "setup": "npm run install-all && npm run migrate",
     "test": "cd frontend && npm test -- --watchAll=false",
+    "test:backend": "cd backend && npm test",
+    "test:backend:coverage": "cd backend && npm run test:coverage",
     "test:e2e": "cd frontend && npm run test:e2e",
-    "test:all": "concurrently \"npm test\" \"npm run test:e2e\""
+    "test:all": "concurrently \"npm run test:backend\" \"npm test\" \"npm run test:e2e\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
