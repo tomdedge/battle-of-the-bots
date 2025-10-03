@@ -145,10 +145,13 @@
   text-align: right !important;
 }
 
-.mantine-DatePicker-day {
-  width: 100% !important;
-  text-align: right !important;
-  justify-content: flex-end !important;
+.mantine-DatePicker-monthCell {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.mantine-DatePicker-monthCell button {
+  margin: 0 auto !important;
 }
 
 /* Week view day headers */

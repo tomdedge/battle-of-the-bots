@@ -18,7 +18,7 @@ export const theme = createTheme({
   primaryColor: 'aura',
   primaryShade: 1,
   other: {
-    backgroundLight: '#EFE2D3',
+    backgroundLight: 'rgba(255, 255, 255, 1)',
     backgroundDark: '#2D1B21', // Darker background for better contrast
     textLight: '#2D1B21', // Darker text for better contrast
     textDark: '#EFE2D3'
