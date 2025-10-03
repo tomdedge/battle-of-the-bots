@@ -12,19 +12,16 @@ test.describe('Tasks Integration', () => {
     await page.goto('/');
     await page.waitForTimeout(1000);
     
-    // Check if we can see the tasks tab
-    const hasTasksTab = await page.getByRole('tab', { name: 'Tasks' }).isVisible();
-    
-    // Should show the tasks tab when authenticated
-    expect(hasTasksTab).toBe(true);
+    // Check if we can see the tasks tab using data-testid
+    await expect(page.locator('[data-testid="tasks-tab"]')).toBeVisible();
   });
 
   test('should navigate to tasks tab when clicked', async ({ page }) => {
     await page.goto('/');
     await page.waitForTimeout(1000);
     
-    // Click tasks tab
-    await page.getByRole('tab', { name: 'Tasks' }).click();
+    // Click tasks tab using data-testid
+    await page.click('[data-testid="tasks-tab"]');
     
     // Should show tasks interface (Add Task button)
     await expect(page.getByText('Add Task')).toBeVisible();

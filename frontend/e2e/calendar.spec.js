@@ -11,8 +11,8 @@ test.describe('Calendar Integration', () => {
   });
 
   test('should show calendar tab and load calendar view', async ({ page }) => {
-    // Click calendar tab
-    await page.getByRole('tab', { name: 'Calendar' }).click();
+    // Click calendar tab using data-testid
+    await page.click('[data-testid="calendar-tab"]');
     
     // Calendar shows view controls (segmented control with Day, Week, Month)
     await expect(page.getByRole('radiogroup')).toBeVisible();
@@ -22,8 +22,8 @@ test.describe('Calendar Integration', () => {
   });
 
   test('should show inline focus block suggestions as ghost events', async ({ page }) => {
-    // Click calendar tab
-    await page.getByRole('tab', { name: 'Calendar' }).click();
+    // Click calendar tab using data-testid
+    await page.click('[data-testid="calendar-tab"]');
     
     // Calendar shows view controls - this confirms calendar loaded
     await expect(page.getByRole('radiogroup')).toBeVisible();
@@ -33,8 +33,8 @@ test.describe('Calendar Integration', () => {
   });
 
   test('should distinguish between actual events and suggestions', async ({ page }) => {
-    // Click calendar tab
-    await page.getByRole('tab', { name: 'Calendar' }).click();
+    // Click calendar tab using data-testid
+    await page.click('[data-testid="calendar-tab"]');
     
     // Calendar shows view controls - this confirms calendar loaded
     await expect(page.getByRole('radiogroup')).toBeVisible();
