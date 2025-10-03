@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Container, Title, Button, Group, Stack, Image, ActionIcon } from '@mantine/core';
+import { Container, Title, Button, Group, Stack, Image, ActionIcon, useMantineColorScheme } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause, IconArrowLeft } from '@tabler/icons-react';
 
 const soundscapes = [
@@ -33,6 +33,7 @@ export function Soundscape({ onBack }) {
   const [activeSoundscape, setActiveSoundscape] = useState('forest');
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
+  const { colorScheme } = useMantineColorScheme();
 
   const currentSoundscape = soundscapes.find(s => s.id === activeSoundscape);
 
@@ -68,7 +69,12 @@ export function Soundscape({ onBack }) {
   };
 
   return (
-    <Container size="md" py="xl">
+    <div style={{ 
+      backgroundColor: colorScheme === 'dark' ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-body)',
+      minHeight: '100vh',
+      width: '100%',
+      padding: '20px'
+    }}>
       <Stack gap="xl">
         <Group justify="space-between" style={{ minHeight: '30px', padding: '5px' }}>
           <ActionIcon
@@ -130,6 +136,6 @@ export function Soundscape({ onBack }) {
 
         <audio ref={audioRef} />
       </Stack>
-    </Container>
+    </div>
   );
 }

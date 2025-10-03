@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Container, Title, Text, Button, Stack, Group } from '@mantine/core';
+import { Container, Title, Text, Button, Stack, Group, useMantineColorScheme } from '@mantine/core';
 import { IconLungs, IconVolume } from '@tabler/icons-react';
 import { BoxBreathingCanvas } from './BoxBreathingCanvas';
 import { Soundscape } from './Soundscape';
 
 export function MeditationMenu() {
   const [activeMode, setActiveMode] = useState(null);
+  const { colorScheme } = useMantineColorScheme();
 
   if (activeMode === 'breathing') {
     return <BoxBreathingCanvas onBack={() => setActiveMode(null)} />;
@@ -16,7 +17,12 @@ export function MeditationMenu() {
   }
 
   return (
-    <Container size="sm" py="xl">
+    <div style={{ 
+      backgroundColor: colorScheme === 'dark' ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-body)',
+      minHeight: '100vh',
+      width: '100%',
+      padding: '40px 20px'
+    }}>
       <Stack align="center" gap="xl">
         <div style={{ textAlign: 'center' }}>
           <Title order={2} c="aura.1">Meditation</Title>
@@ -53,6 +59,6 @@ export function MeditationMenu() {
           </Button>
         </Group>
       </Stack>
-    </Container>
+    </div>
   );
 }

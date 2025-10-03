@@ -197,8 +197,11 @@ export function BoxBreathingCanvas({ onBack }) {
       h="100%" 
       gap={0}
       style={{ 
-        backgroundColor: 'var(--mantine-color-body)',
-        overflow: 'hidden'
+        backgroundColor: colorScheme === 'dark' ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-body)',
+        overflow: 'hidden',
+        width: '100vw',
+        margin: 0,
+        padding: 0
       }}
     >
       <div 
@@ -212,16 +215,16 @@ export function BoxBreathingCanvas({ onBack }) {
       >
         <Stack gap={0} style={{ height: '100%' }}>
           {onBack && (
-            <Group justify="center" style={{ minHeight: '30px', padding: '5px', marginTop: '30px', marginBottom: '-20px', position: 'relative' }}>
+            <Group justify="space-between" style={{ minHeight: '30px', padding: '5px', marginTop: '30px', marginBottom: '-20px' }}>
               <ActionIcon
                 onClick={onBack}
                 variant="subtle"
                 size="lg"
-                style={{ position: 'absolute', left: 'calc(50% - 375px)' }}
               >
                 <IconArrowLeft size={20} />
               </ActionIcon>
               <Title order={2} c="aura.1">Box Breathing</Title>
+              <div style={{ width: 40 }} />
             </Group>
           )}
           
