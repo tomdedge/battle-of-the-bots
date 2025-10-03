@@ -16,31 +16,20 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for token in URL (from OAuth callback)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
-    
-    if (urlToken) {
-      setToken(urlToken);
-      localStorage.setItem('authToken', urlToken);
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    if (token) {
-      // Handle mock token for MSW testing
-      if (token === 'mock-jwt-token') {
-        setUser({
-          id: 'test-user-123',
-          googleId: 'test-google-id',
-          email: 'test@example.com',
-          name: 'Test User',
-          picture: null
-        });
-      } else {
-        // Decode real JWT to get user info
+    const checkAuth = async () => {
+      // Check for token in URL (from OAuth callback in development)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token');
+      
+      if (urlToken) {
+        setToken(urlToken);
+        localStorage.setItem('authToken', urlToken);
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Decode JWT to get user info
         try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
+          const payload = JSON.parse(atob(urlToken.split('.')[1]));
           setUser({
             id: payload.userId,
             googleId: payload.googleId,
@@ -50,12 +39,51 @@ export const AuthProvider = ({ children }) => {
           });
         } catch (error) {
           console.error('Invalid token:', error);
-          logout();
+        }
+      } else if (token) {
+        // Handle existing token from localStorage
+        if (token === 'mock-jwt-token') {
+          setUser({
+            id: 'test-user-123',
+            googleId: 'test-google-id',
+            email: 'test@example.com',
+            name: 'Test User',
+            picture: null
+          });
+        } else {
+          // Decode real JWT to get user info
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            setUser({
+              id: payload.userId,
+              googleId: payload.googleId,
+              email: payload.email,
+              name: payload.name,
+              picture: payload.picture
+            });
+          } catch (error) {
+            console.error('Invalid token:', error);
+            logout();
+          }
+        }
+      } else {
+        // Check if authenticated via httpOnly cookie (production)
+        try {
+          const response = await fetch('/auth/status', {
+            credentials: 'include' // Include cookies
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+          }
+        } catch (error) {
+          console.log('Not authenticated via cookie');
         }
       }
-    }
-    
-    setLoading(false);
+      setLoading(false);
+    };
+
+    checkAuth();
   }, [token]);
 
   const login = () => {

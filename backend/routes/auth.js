@@ -51,6 +51,19 @@ router.get('/chat/history', authenticateToken, async (req, res) => {
   }
 });
 
+// Check authentication status (for httpOnly cookies)
+router.get('/status', authenticateToken, (req, res) => {
+  res.json({ 
+    authenticated: true, 
+    user: {
+      id: req.user.userId,
+      email: req.user.email,
+      name: req.user.name,
+      picture: req.user.picture
+    }
+  });
+});
+
 // Clear all chat history
 router.delete('/chat/history', authenticateToken, async (req, res) => {
   try {
