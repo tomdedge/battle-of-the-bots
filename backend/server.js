@@ -112,7 +112,13 @@ io.on('connection', async (socket) => {
     socket.emit('models', { 
       models: models.data || [], 
       initialModel: preferences?.preferred_model || firstAvailableModel,
-      user: socket.user
+      user: {
+        ...socket.user,
+        tts_enabled: preferences?.tts_enabled,
+        tts_voice: preferences?.tts_voice,
+        tts_rate: preferences?.tts_rate,
+        tts_pitch: preferences?.tts_pitch
+      }
     });
   } catch (error) {
     console.error('Failed to fetch models:', error.message);
@@ -125,7 +131,13 @@ io.on('connection', async (socket) => {
         socket.emit('models', { 
           models: models.data || [], 
           initialModel: firstAvailableModel,
-          user: socket.user
+          user: {
+            ...socket.user,
+            tts_enabled: false,
+            tts_voice: 'default',
+            tts_rate: 1.0,
+            tts_pitch: 1.0
+          }
         });
       } else {
         throw new Error('No models in API response');
@@ -170,6 +182,15 @@ io.on('connection', async (socket) => {
       });
     } catch (error) {
       console.error('Failed to update model preference:', error);
+    }
+  });
+
+  // Handle TTS preference updates
+  socket.on('update_tts_preference', async (data) => {
+    try {
+      await dbService.updateUserPreferences(socket.user.userId, data);
+    } catch (error) {
+      console.error('Failed to update TTS preference:', error);
     }
   });
 

@@ -85,16 +85,28 @@ class DatabaseService {
 
   async updateUserPreferences(userId, preferences) {
     const query = `
-      INSERT INTO user_preferences (user_id, preferred_model, theme)
-      VALUES ($1, $2, $3)
+      INSERT INTO user_preferences (user_id, preferred_model, theme, tts_enabled, tts_voice, tts_rate, tts_pitch)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT (user_id)
       DO UPDATE SET 
-        preferred_model = COALESCE($2, preferred_model),
-        theme = COALESCE($3, theme),
+        preferred_model = COALESCE(EXCLUDED.preferred_model, user_preferences.preferred_model),
+        theme = COALESCE(EXCLUDED.theme, user_preferences.theme),
+        tts_enabled = COALESCE(EXCLUDED.tts_enabled, user_preferences.tts_enabled),
+        tts_voice = COALESCE(EXCLUDED.tts_voice, user_preferences.tts_voice),
+        tts_rate = COALESCE(EXCLUDED.tts_rate, user_preferences.tts_rate),
+        tts_pitch = COALESCE(EXCLUDED.tts_pitch, user_preferences.tts_pitch),
         updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `;
-    const values = [userId, preferences.preferred_model, preferences.theme];
+    const values = [
+      userId, 
+      preferences.preferred_model, 
+      preferences.theme,
+      preferences.tts_enabled,
+      preferences.tts_voice,
+      preferences.tts_rate,
+      preferences.tts_pitch
+    ];
     const result = await this.pool.query(query, values);
     return result.rows[0];
   }

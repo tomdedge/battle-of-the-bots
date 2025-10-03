@@ -41,6 +41,28 @@ class AIService {
     return this.defaultModel;
   }
 
+  formatToolError(error) {
+    const message = error.message || 'Unknown error occurred';
+    
+    // Handle authentication errors specially
+    if (message.includes('Google authentication tokens have expired') || 
+        message.includes('User not authenticated')) {
+      return 'Authentication Error: Your Google account connection has expired. Please tell the user to sign out and sign back in to refresh their Google authentication. Until then, Google Calendar and Tasks features will not work.';
+    }
+    
+    // Handle invalid ID errors
+    if (message.includes('not found or invalid') && message.includes('call tasks_get_tasks')) {
+      return message; // Already has helpful instructions
+    }
+    
+    if (message.includes('not found') && message.includes('call calendar_get_events')) {
+      return message; // Already has helpful instructions
+    }
+    
+    // Generic error
+    return `Tool Error: ${message}`;
+  }
+
   async sendMessage(message, model, userId = null, sessionId = null) {
     if (!model) {
       model = this.getDefaultModel();
@@ -53,6 +75,9 @@ class AIService {
         }
       }
     }
+
+    console.log(`💬 USER MESSAGE (${userId}):`, message);
+
     try {
       // Get user context for personalized system prompt
       let systemContent = 'You are AuraFlow, a mindful productivity assistant. Keep responses concise and helpful.';
@@ -94,7 +119,17 @@ Available Functions:
 - tasks_complete_task: Complete tasks
 - tasks_get_task_lists: Get task lists
 
-Keep responses concise, helpful, and personalized. Use their name when appropriate. When creating events or tasks, use the available functions.`;
+IMPORTANT WORKFLOW RULES:
+1. To DELETE a task: Use tasks_delete_task with taskName parameter (e.g., {"taskName": "Brush teeth"})
+2. To DELETE a calendar event: Use calendar_delete_event with eventName parameter (e.g., {"eventName": "Watch stranger things"})
+3. To UPDATE a task: First call tasks_get_tasks to get the task ID, then use tasks_update_task
+4. To COMPLETE a task: First call tasks_get_tasks to get the task ID, then use tasks_complete_task
+5. To UPDATE a calendar event: First call calendar_get_events to get the event ID, then use calendar_update_event
+6. Never claim you've completed an action unless you actually called the appropriate tool
+7. tasks_get_tasks only RETRIEVES tasks - it does NOT delete, update, or complete them
+8. calendar_get_events only RETRIEVES events - it does NOT delete or update them
+
+Keep responses concise, helpful, and personalized. Use their name when appropriate.`;
       }
 
       // Get conversation history
@@ -141,6 +176,25 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         }
       }));
 
+      console.log(`🛠️  AVAILABLE TOOLS (${tools.length}):`, tools.map(t => t.function.name));
+      
+      // Check if delete tools are included
+      const hasDeleteTask = tools.some(t => t.function.name === 'tasks_delete_task');
+      const hasDeleteEvent = tools.some(t => t.function.name === 'calendar_delete_event');
+      
+      console.log(`🗑️  tasks_delete_task included:`, hasDeleteTask);
+      console.log(`🗑️  calendar_delete_event included:`, hasDeleteEvent);
+      
+      if (hasDeleteTask) {
+        const deleteTaskTool = tools.find(t => t.function.name === 'tasks_delete_task');
+        console.log(`🗑️  tasks_delete_task definition:`, JSON.stringify(deleteTaskTool, null, 2));
+      }
+      
+      if (hasDeleteEvent) {
+        const deleteEventTool = tools.find(t => t.function.name === 'calendar_delete_event');
+        console.log(`🗑️  calendar_delete_event definition:`, JSON.stringify(deleteEventTool, null, 2));
+      }
+
       // Temporarily disable TLS verification for internal services
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -184,6 +238,14 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
 
       // Handle tool calls
       if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
+        console.log(`🤖 LLM INTENDED TOOL CALLS (${aiMessage.tool_calls.length}):`, 
+          aiMessage.tool_calls.map(tc => ({
+            name: tc.function.name,
+            args: JSON.parse(tc.function.arguments),
+            id: tc.id
+          }))
+        );
+        
         const toolResults = [];
         
         for (const toolCall of aiMessage.tool_calls) {
@@ -194,8 +256,21 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
             // Add userId to tool arguments
             toolArgs.userId = userId;
             
-            console.log(`Executing tool: ${toolName}`, toolArgs);
+            console.log(`🔧 TOOL CALL: ${toolName}`, {
+              user: userId,
+              args: toolArgs,
+              callId: toolCall.id
+            });
+            
+            const startTime = Date.now();
             const result = await AuraFlowTools.executeTool(toolName, toolArgs);
+            const duration = Date.now() - startTime;
+            
+            console.log(`✅ TOOL SUCCESS: ${toolName} (${duration}ms)`, {
+              user: userId,
+              callId: toolCall.id,
+              result: typeof result === 'object' ? JSON.stringify(result).substring(0, 200) + '...' : result
+            });
             
             toolResults.push({
               tool_call_id: toolCall.id,
@@ -203,11 +278,20 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
               content: JSON.stringify(result)
             });
           } catch (error) {
-            console.error(`Tool execution error for ${toolCall.function.name}:`, error);
+            console.error(`❌ TOOL ERROR: ${toolCall.function.name}`, {
+              user: userId,
+              callId: toolCall.id,
+              error: error.message,
+              args: JSON.parse(toolCall.function.arguments)
+            });
+            
             toolResults.push({
               tool_call_id: toolCall.id,
               role: 'tool',
-              content: JSON.stringify({ error: error.message })
+              content: JSON.stringify({ 
+                error: this.formatToolError(error),
+                success: false
+              })
             });
           }
         }
@@ -244,6 +328,9 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         }
         
         finalResponse = followUpData.choices[0].message.content;
+        console.log(`🤖 LLM FINAL RESPONSE (${userId}):`, finalResponse);
+      } else {
+        console.log(`🤖 LLM RESPONSE (${userId}):`, finalResponse);
       }
 
       // Save chat message to database if user is authenticated

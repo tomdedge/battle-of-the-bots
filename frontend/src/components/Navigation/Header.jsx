@@ -1,9 +1,10 @@
-import { Group, ActionIcon, Title, Drawer, Stack, Button, Text, Modal } from '@mantine/core';
-import { IconSun, IconMoon, IconMenu2, IconLogout, IconTrash } from '@tabler/icons-react';
+import { Group, ActionIcon, Title, Drawer, Stack, Button, Text, Modal, Divider } from '@mantine/core';
+import { IconSun, IconMoon, IconMenu2, IconLogout, IconTrash, IconMicrophone } from '@tabler/icons-react';
 import { useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../hooks/useSocket';
+import { TTSSettings } from '../Settings/TTSSettings';
 import ApiService from '../../services/api';
 
 export function Header() {
@@ -11,7 +12,7 @@ export function Header() {
   const [opened, { open, close }] = useDisclosure(false);
   const [confirmOpened, { open: openConfirm, close: closeConfirm }] = useDisclosure(false);
   const { user, logout, token } = useAuth();
-  const { setChatHistory, clearChatHistory } = useSocket();
+  const { setChatHistory, clearChatHistory, ttsPreferences, updateTTSPreferences } = useSocket();
 
   const handleLogout = () => {
     logout();
@@ -59,6 +60,11 @@ export function Header() {
           <Text size="sm" fw={500}>
             Signed in as {user?.name}
           </Text>
+          
+          <Divider label="Text-to-Speech" labelPosition="center" />
+          <TTSSettings />
+          
+          <Divider />
           
           <Button
             leftSection={<IconTrash size={16} />}

@@ -7,9 +7,14 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 // Initiate Google OAuth
-router.get('/google', passport.authenticate('google', { 
-  scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/tasks']
-}));
+router.get('/google', (req, res, next) => {
+  // Force consent to get refresh token
+  passport.authenticate('google', { 
+    scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/tasks'],
+    accessType: 'offline',
+    prompt: 'consent'
+  })(req, res, next);
+});
 
 // Google OAuth callback
 router.get('/google/callback', 

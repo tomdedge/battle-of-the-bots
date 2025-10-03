@@ -52,14 +52,17 @@ class CalendarTools {
       },
       {
         name: 'calendar_delete_event',
-        description: 'Delete a calendar event',
+        description: 'Delete a calendar event by ID or by name/title. Provide either eventId OR eventName.',
         inputSchema: {
           type: 'object',
           properties: {
             userId: { type: 'string', description: 'User ID' },
-            eventId: { type: 'string', description: 'Event ID' }
+            eventId: { type: 'string', description: 'Event ID (if known)' },
+            eventName: { type: 'string', description: 'Event name/title to search for and delete' },
+            startDate: { type: 'string', description: 'Start date to search within (ISO format, optional)' },
+            endDate: { type: 'string', description: 'End date to search within (ISO format, optional)' }
           },
-          required: ['userId', 'eventId']
+          required: ['userId']
         }
       }
     ];
@@ -106,8 +109,41 @@ class CalendarTools {
   }
 
   static async deleteEvent(args) {
-    const { userId, eventId } = args;
-    return await calendarService.deleteEvent(userId, eventId);
+    const { userId, eventId, eventName, startDate, endDate } = args;
+    
+    if (!eventId && !eventName) {
+      throw new Error('Either eventId or eventName must be provided');
+    }
+    
+    if (eventName) {
+      // Convert date strings to ISO format if needed
+      let searchStartDate = startDate;
+      let searchEndDate = endDate;
+      
+      if (startDate && !startDate.includes('T')) {
+        // Convert YYYY-MM-DD to full ISO datetime
+        searchStartDate = new Date(startDate + 'T00:00:00').toISOString();
+      }
+      
+      if (endDate && !endDate.includes('T')) {
+        // Convert YYYY-MM-DD to full ISO datetime (end of day)
+        searchEndDate = new Date(endDate + 'T23:59:59').toISOString();
+      }
+      
+      // Find event by name first
+      const events = await calendarService.getEvents(userId, searchStartDate, searchEndDate);
+      const matchingEvent = events.find(event => 
+        event.summary && event.summary.toLowerCase().includes(eventName.toLowerCase())
+      );
+      
+      if (!matchingEvent) {
+        throw new Error(`No event found with name containing "${eventName}"`);
+      }
+      
+      return await calendarService.deleteEvent(userId, matchingEvent.id);
+    } else {
+      return await calendarService.deleteEvent(userId, eventId);
+    }
   }
 }
 

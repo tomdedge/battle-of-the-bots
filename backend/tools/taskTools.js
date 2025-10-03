@@ -50,15 +50,16 @@ class TaskTools {
       },
       {
         name: 'tasks_delete_task',
-        description: 'Delete a task',
+        description: 'Delete a task by ID or by name. Provide either taskId OR taskName.',
         inputSchema: {
           type: 'object',
           properties: {
             userId: { type: 'string', description: 'User ID' },
-            taskId: { type: 'string', description: 'Task ID' },
+            taskId: { type: 'string', description: 'Task ID (if known)' },
+            taskName: { type: 'string', description: 'Task name/title to search for and delete' },
             taskListId: { type: 'string', description: 'Task list ID (defaults to @default)' }
           },
-          required: ['userId', 'taskId']
+          required: ['userId']
         }
       },
       {
@@ -137,8 +138,27 @@ class TaskTools {
   }
 
   static async deleteTask(args) {
-    const { userId, taskId, taskListId = '@default' } = args;
-    return await tasksService.deleteTask(userId, taskId, taskListId);
+    const { userId, taskId, taskName, taskListId = '@default' } = args;
+    
+    if (!taskId && !taskName) {
+      throw new Error('Either taskId or taskName must be provided');
+    }
+    
+    if (taskName) {
+      // Find task by name first
+      const tasks = await tasksService.getTasks(userId, taskListId);
+      const matchingTask = tasks.find(task => 
+        task.title && task.title.toLowerCase().includes(taskName.toLowerCase())
+      );
+      
+      if (!matchingTask) {
+        throw new Error(`No task found with name containing "${taskName}"`);
+      }
+      
+      return await tasksService.deleteTask(userId, matchingTask.id, taskListId);
+    } else {
+      return await tasksService.deleteTask(userId, taskId, taskListId);
+    }
   }
 
   static async completeTask(args) {

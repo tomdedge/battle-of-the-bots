@@ -16,7 +16,8 @@ export const ChatInterface = () => {
     chatHistory,
     setChatHistory,
     regenerateResponse,
-    user
+    user,
+    ttsPreferences
   } = useSocket();
   const scrollAreaRef = useRef();
 
