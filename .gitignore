@@ -8,3 +8,5 @@ frontend/test-results/
 frontend/playwright-report/
 backend/test-results/
 backend/temp/
+/backend/coverage/
+/.idea
