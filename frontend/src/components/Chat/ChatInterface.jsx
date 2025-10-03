@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Stack, ScrollArea, Text, Loader, Center, Box } from '@mantine/core';
 import { useSocket } from '../../hooks/useSocket';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTTS } from '../../contexts/TTSContext';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import ApiService from '../../services/api';
@@ -9,6 +10,7 @@ import ApiService from '../../services/api';
 export const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { token } = useAuth();
+  const { speakText, preferences } = useTTS();
   const { 
     isConnected, 
     sendMessage, 
@@ -24,10 +26,15 @@ export const ChatInterface = () => {
   useEffect(() => {
     const cleanup = onAIResponse((response) => {
       setIsLoading(false);
+      
+      // Auto-play Aurora's response if enabled
+      if (preferences?.tts_autoplay && response?.message) {
+        setTimeout(() => speakText(response.message), 500); // Small delay to ensure UI updates
+      }
     });
 
     return cleanup;
-  }, [onAIResponse]);
+  }, [onAIResponse, preferences?.tts_autoplay, speakText]);
 
   useEffect(() => {
     // Auto-scroll to bottom when chat history updates
