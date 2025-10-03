@@ -27,7 +27,7 @@ export const useSocket = () => {
         // Extract TTS preferences from user data
         if (serverUser) {
           const ttsPrefs = {
-            tts_enabled: serverUser.tts_enabled || false,
+            tts_enabled: serverUser.tts_enabled !== false, // Default to true
             tts_voice: serverUser.tts_voice || 'default',
             tts_rate: serverUser.tts_rate || 1.0,
             tts_pitch: serverUser.tts_pitch || 1.0
