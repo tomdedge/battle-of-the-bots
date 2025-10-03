@@ -16,6 +16,7 @@ in the sidebar menu
 ✅ Ensure text "Dashed events are focus block..." responds correctly to light/dark mode - Changed to use Mantine's `c="dimmed"` prop for proper theme support
 ✅ The meditation tab does not support dark mode. The background (including the canvas background (which can probably be transparent)) needs to be like the other tab backgrounds in dark mode. The canvas shape colors should also be adjusted for dark mode to a lighter color for each shape.
 ✅ Implement Focus Session Management - Created SessionTimer component with start/pause/stop controls, integrated with calendar suggestions, added session completion celebrations, and basic session history tracking
+✅ Persist the users active tab across refreshes - Added localStorage persistence for active tab with validation and logout cleanup
 
 TODO:
 

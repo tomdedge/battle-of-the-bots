@@ -18,7 +18,13 @@ import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 
 function MainApp() {
-  const [activeTab, setActiveTab] = useState('chat');
+  // Initialize activeTab from localStorage or default to 'chat'
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('activeTab');
+    const validTabs = ['chat', 'calendar', 'tasks', 'meditation'];
+    return savedTab && validTabs.includes(savedTab) ? savedTab : 'chat';
+  });
+  
   const [colorScheme, setColorScheme] = useLocalStorage({
     key: 'mantine-color-scheme',
     defaultValue: 'light',
@@ -27,6 +33,11 @@ function MainApp() {
   const [showMindfulnessModal, setShowMindfulnessModal] = useState(false);
   const [suggestedTime, setSuggestedTime] = useState(null);
   const { token } = useAuth();
+
+  // Save activeTab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     if (token) {

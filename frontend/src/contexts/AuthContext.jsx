@@ -66,6 +66,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('authToken');
+    localStorage.removeItem('activeTab'); // Clear saved tab on logout
   };
 
   return (
