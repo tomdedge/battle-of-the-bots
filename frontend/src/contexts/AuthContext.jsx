@@ -67,6 +67,14 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     localStorage.removeItem('authToken');
     localStorage.removeItem('activeTab'); // Clear saved tab on logout
+    
+    // Clear suggestion cache on logout
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith('suggestions_')) {
+        localStorage.removeItem(key);
+      }
+    });
   };
 
   return (

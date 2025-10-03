@@ -35,6 +35,24 @@ class ApiService {
 
   async analyzeCalendar(date, days = 1) {
     const url = `${this.baseURL}/api/calendar/analyze?date=${date}&days=${days}`;
+    
+    // Generate cache key
+    const cacheKey = `suggestions_${date}_${days}_${this.token?.slice(-8) || 'anon'}`;
+    
+    // Check cache first
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const isExpired = Date.now() - timestamp > 5 * 60 * 1000; // 5 minutes
+      
+      if (!isExpired) {
+        console.log('Using cached suggestions for:', date, days);
+        return data;
+      } else {
+        localStorage.removeItem(cacheKey);
+      }
+    }
+    
     console.log('Making analyze request to:', url);
     
     const response = await fetch(url, {
@@ -48,6 +66,13 @@ class ApiService {
     
     const result = await response.json();
     console.log('Analyze calendar result:', result);
+    
+    // Cache the result
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data: result,
+      timestamp: Date.now()
+    }));
+    
     return result;
   }
 
@@ -60,7 +85,22 @@ class ApiService {
       },
       body: JSON.stringify(focusBlock)
     });
+    
+    // Clear suggestion cache when calendar is modified
+    this.clearSuggestionCache();
+    
     return response.json();
+  }
+
+  clearSuggestionCache() {
+    // Clear all suggestion cache entries
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith('suggestions_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('Cleared suggestion cache');
   }
 
   async getTaskLists() {
