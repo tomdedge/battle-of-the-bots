@@ -158,7 +158,7 @@ function MainApp() {
   return (
     <AppShell
       header={{ height: 60 }}
-      padding="md"
+      padding={0}
       style={{
         backgroundColor: colorScheme === 'dark' ? theme.other.backgroundDark : theme.other.backgroundLight,
         minHeight: '100vh'
@@ -168,8 +168,19 @@ function MainApp() {
         <Header />
       </AppShell.Header>
       
-      <AppShell.Main style={{ paddingBottom: 'calc(60px + var(--mantine-spacing-md))' }}>
-        {renderContent()}
+      <AppShell.Main style={{ 
+        height: 'calc(100vh - 60px)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column',
+          paddingBottom: '60px'
+        }}>
+          {renderContent()}
+        </div>
       </AppShell.Main>
       
       <BottomTabs activeTab={activeTab} setActiveTab={setActiveTab} />

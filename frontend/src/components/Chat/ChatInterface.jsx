@@ -98,7 +98,7 @@ export const ChatInterface = () => {
 
   return (
     <Stack h="100%" gap={0} style={{ display: 'flex', flexDirection: 'column' }}>
-      <ScrollArea style={{ flex: 1 }} p="xs" ref={scrollAreaRef}>
+      <ScrollArea style={{ flex: 1 }} px="md" pt="md" ref={scrollAreaRef}>
         {messages.length === 0 ? (
           <Center h="100%">
             <Stack align="center" gap="xs">
@@ -125,12 +125,13 @@ export const ChatInterface = () => {
       </ScrollArea>
       
       <Stack 
-        p="sm" 
+        p="md" 
         gap="xs" 
         style={{ 
           flexShrink: 0,
           backgroundColor: 'var(--mantine-color-body)',
-          borderTop: '1px solid var(--mantine-color-gray-3)'
+          borderTop: '1px solid var(--mantine-color-gray-3)',
+          paddingBottom: 'calc(60px + var(--mantine-spacing-md))'
         }}
       >
         {!isConnected && (
