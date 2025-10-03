@@ -8,6 +8,7 @@ const router = express.Router();
 
 // Initiate Google OAuth
 router.get('/google', (req, res, next) => {
+  console.log('🔐 Google OAuth initiated');
   // Force consent to get refresh token
   passport.authenticate('google', { 
     scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/tasks'],
@@ -18,15 +19,20 @@ router.get('/google', (req, res, next) => {
 
 // Google OAuth callback
 router.get('/google/callback', 
+  (req, res, next) => {
+    console.log('🔐 Google OAuth callback received');
+    next();
+  },
   passport.authenticate('google', { session: false }),
   (req, res) => {
+    console.log('🔐 Google OAuth successful, generating JWT');
     const token = googleAuthService.generateJWT(req.user);
     
-    // Set httpOnly cookie for production
+    // Set cookie for production
     if (process.env.NODE_ENV === 'production') {
       res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: true,
+        httpOnly: false, // Allow frontend to read the cookie
+        secure: process.env.NODE_ENV === 'production' && !process.env.DOCKER_ENV,
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });

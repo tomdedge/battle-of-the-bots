@@ -11,7 +11,21 @@ A personal AI assistant with calendar integration, task management, and text-to-
 
 ### Installation
 
-1. **Clone and setup:**
+#### Option 1: Docker (Recommended)
+```bash
+git clone <repository-url>
+cd auraflow
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Build and run
+docker-compose up --build
+```
+Access at `http://localhost:3001`
+
+#### Option 2: Local Development
 ```bash
 git clone <repository-url>
 cd auraflow

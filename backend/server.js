@@ -67,13 +67,25 @@ app.use(express.json());
 app.use(passport.initialize());
 app.use('/avatars', express.static(path.join(__dirname, 'public/avatars')));
 
-// Routes
+// Routes (must come BEFORE static middleware)
 app.use('/auth', authRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/tools', toolsRoutes);
-app.use('/api/tts', ttsRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/tts', ttsRoutes);
+
+// Serve frontend build in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/build')));
+  
+  // Handle React Router - send all non-API requests to index.html
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/auth/')) {
+      res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+    }
+  });
+}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

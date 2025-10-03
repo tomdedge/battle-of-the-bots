@@ -12,7 +12,10 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('authToken'));
+  const [token, setToken] = useState(
+    localStorage.getItem('authToken') || 
+    document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1]
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

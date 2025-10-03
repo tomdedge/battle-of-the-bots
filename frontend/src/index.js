@@ -19,4 +19,9 @@ root.render(
   </React.StrictMode>
 );
 
-serviceWorkerRegistration.register();
+// Only register service worker in production, not in Docker
+if (process.env.NODE_ENV === 'production' && !window.location.hostname.includes('localhost')) {
+  serviceWorkerRegistration.register();
+} else {
+  serviceWorkerRegistration.unregister();
+}
