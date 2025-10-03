@@ -1,4 +1,4 @@
-import { Group, ActionIcon, Title, Drawer, Stack, Button, Text, Modal, Divider } from '@mantine/core';
+import { Group, ActionIcon, Title, Drawer, Stack, Button, Text, Modal, Divider, Avatar } from '@mantine/core';
 import { IconSun, IconMoon, IconMenu2, IconLogout, IconTrash, IconMicrophone } from '@tabler/icons-react';
 import { useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -39,7 +39,7 @@ export function Header() {
             alt="AuraFlow" 
             style={{ width: 43, aspectRatio: 1, borderRadius: '50%' }}
           />
-          <Title order={3} c="aura.1">AuraFlow</Title>
+          <Title order={3} style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, color: 'var(--aura-primary)' }}>AuraFlow</Title>
         </Group>
         
         <Group>
@@ -62,11 +62,25 @@ export function Header() {
         </Group>
       </Group>
 
-      <Drawer opened={opened} onClose={close} title="Menu" position="right">
+      <Drawer 
+        opened={opened} 
+        onClose={close} 
+        title={<Text fw={700} size="lg" style={{ color: 'var(--aura-primary)' }}>Menu</Text>} 
+        position="right"
+      >
         <Stack gap="md">
-          <Text size="sm" fw={500}>
-            Signed in as {user?.name}
-          </Text>
+          <Group gap="sm">
+            <Avatar 
+              src={user?.picture}
+              size="sm" 
+              color="aura"
+            >
+              {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+            </Avatar>
+            <Text size="sm" fw={500}>
+              Signed in as {user?.name}
+            </Text>
+          </Group>
           
           <Divider label="Text-to-Speech" labelPosition="center" />
           <TTSSettings />

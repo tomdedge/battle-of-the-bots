@@ -5,10 +5,14 @@ const TTSContext = createContext();
 export const TTSProvider = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [voices, setVoices] = useState([]);
-  const [preferences, setPreferences] = useState({ tts_enabled: true }); // Default enabled
+  const [preferences, setPreferences] = useState(() => {
+    // Load preferences from localStorage on init
+    const saved = localStorage.getItem('tts_preferences');
+    return saved ? JSON.parse(saved) : { tts_enabled: true };
+  });
   const [socket, setSocket] = useState(null);
   const [serverTTSInProgress, setServerTTSInProgress] = useState(false);
-  const [isStopped, setIsStopped] = useState(false); // Flag to prevent playing after stop
+  const [isStopped, setIsStopped] = useState(false);
   const currentRequestIdRef = useRef(null);
   const utteranceRef = useRef(null);
   const audioRef = useRef(null);
@@ -301,7 +305,10 @@ export const TTSProvider = ({ children }) => {
   };
 
   const updatePreferences = (newPrefs) => {
-    setPreferences(prev => ({ ...prev, ...newPrefs }));
+    const updatedPrefs = { ...preferences, ...newPrefs };
+    setPreferences(updatedPrefs);
+    // Save to localStorage
+    localStorage.setItem('tts_preferences', JSON.stringify(updatedPrefs));
   };
 
   return (

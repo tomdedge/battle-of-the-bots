@@ -53,6 +53,7 @@ const calendarRoutes = require('./routes/calendar');
 const tasksRoutes = require('./routes/tasks');
 const toolsRoutes = require('./routes/tools');
 const ttsRoutes = require('./routes/tts');
+const userRoutes = require('./routes/user');
 
 const app = express();
 const server = http.createServer(app);
@@ -72,6 +73,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/tts', ttsRoutes);
+app.use('/api/user', userRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

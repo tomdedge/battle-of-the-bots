@@ -94,7 +94,16 @@ export const TasksView = () => {
   const completedTasks = tasks.filter(task => task.status === 'completed');
 
   return (
-    <Stack h="100%" gap={0}>
+    <Stack
+      h="100%"
+      gap={8}
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        backgroundColor: 'var(--mantine-color-body)',
+        overflow: 'hidden',
+      }}
+    >
       <Box pb={0}>
         <Paper p="md">
           <Group justify="space-between">
@@ -118,8 +127,8 @@ export const TasksView = () => {
         </Paper>
       </Box>
 
-      <ScrollArea h={0} style={{ flex: 1 }} p="md" pt={0}>
-        <Paper pos="relative">
+      <ScrollArea h={0} style={{ flex: 1 }} pt={0}>
+        <Paper p="md" pos="relative">
           <LoadingOverlay visible={loading} />
           
           <Stack gap="md">

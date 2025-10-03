@@ -53,11 +53,10 @@ export const ChatInput = ({ onSendMessage, disabled }) => {
           <ActionIcon
             onClick={toggleListening}
             variant="filled"
-            color={isListening ? "red" : "aura.1"}
             disabled={disabled}
             style={{
-              backgroundColor: isListening ? '#ef4444' : undefined,
-              color: isListening ? 'white' : undefined
+              backgroundColor: isListening ? '#ef4444' : 'var(--aura-primary)',
+              color: 'white'
             }}
           >
             {isListening ? <IconMicrophoneOff size={16} /> : <IconMicrophone size={16} />}
@@ -66,8 +65,11 @@ export const ChatInput = ({ onSendMessage, disabled }) => {
         <ActionIcon
           type="submit"
           variant="filled"
-          color="aura.1"
           disabled={!message.trim() || disabled}
+          style={{
+            backgroundColor: 'var(--aura-primary)',
+            color: 'white'
+          }}
         >
           <IconSend size={16} />
         </ActionIcon>

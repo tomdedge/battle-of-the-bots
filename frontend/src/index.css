@@ -1,0 +1,11 @@
+:root {
+  --aura-primary: #0A8FA8;
+}
+
+[data-mantine-color-scheme="dark"] {
+  --aura-primary: hwb(189 5% 18%);
+}
+
+[data-mantine-color-scheme="light"] {
+  --aura-primary: #0A8FA8;
+}

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+import './index.css';
 
 // Start MSW for E2E tests
 if (process.env.REACT_APP_MSW_ENABLED === 'true') {

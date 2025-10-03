@@ -1,3 +1,13 @@
+/* Active tab styling */
+.mantine-Tabs-tab[data-active="true"] {
+  background-color: var(--aura-primary) !important;
+  color: white !important;
+}
+
+.mantine-Tabs-tab[data-active="true"] svg {
+  color: white !important;
+}
+
 /* Hide tab labels on narrow screens */
 @media (max-width: 480px) {
   .tab-label {

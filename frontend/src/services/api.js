@@ -101,6 +101,16 @@ class ApiService {
     });
     return response.json();
   }
+
+  async getUserAvatar(userId) {
+    const response = await fetch(`${this.baseURL}/api/user/avatar/${userId}`, {
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    if (response.ok) {
+      return response.blob();
+    }
+    throw new Error('Avatar not found');
+  }
 }
 
 export default ApiService;

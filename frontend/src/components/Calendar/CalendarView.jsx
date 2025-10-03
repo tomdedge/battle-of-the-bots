@@ -162,9 +162,18 @@ export const CalendarView = () => {
   };
 
   return (
-    <Stack h="100%" gap={0}>
-      <Box p="md" pb={0}>
-        <Paper>
+    <Stack
+      h="100%"
+      gap={0} 
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        backgroundColor: 'var(--mantine-color-body)',
+        overflow: 'hidden',
+      }}
+    >
+      <Box p="xs" pb={0}>
+        <Paper p="md">
           <Group justify="space-between" align="center" wrap="nowrap">
             <ActionIcon 
               variant="subtle" 
@@ -248,8 +257,8 @@ export const CalendarView = () => {
         )}
       </Box>
 
-      <ScrollArea h={0} style={{ flex: 1 }} p="md" pt={0}>
-        <Paper pos="relative">
+      <ScrollArea h={0} style={{ flex: 1 }} p="xs" pt={0}>
+        <Paper pos="relative" p="md">
           <LoadingOverlay visible={loading} />
           <Calendar
             localizer={localizer}
