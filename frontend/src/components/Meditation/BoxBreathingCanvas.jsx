@@ -9,13 +9,13 @@ export function BoxBreathingCanvas() {
   const [timeLeft, setTimeLeft] = useState(4);
   const [progress, setProgress] = useState(0);
 
-  const boxSize = 200;
-  const centerX = 150;
-  const centerY = 150;
+  const boxSize = 240;
+  const centerX = 175;
+  const centerY = 175;
 
   const getCircleRadius = () => {
-    const baseRadius = 60;
-    const maxRadius = 100;
+    const baseRadius = 80;
+    const maxRadius = 110;
     
     if (phase === 'inhale') {
       return baseRadius + (progress * (maxRadius - baseRadius));
@@ -190,8 +190,8 @@ export function BoxBreathingCanvas() {
           >
             <canvas
               ref={canvasRef}
-              width={300}
-              height={300}
+              width={350}
+              height={350}
               style={{
                 borderRadius: '50%',
                 background: 'transparent',
