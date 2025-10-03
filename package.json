@@ -4,7 +4,8 @@
   "description": "A personal AI assistant with calendar integration, task management, and text-to-speech capabilities",
   "scripts": {
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
-    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start": "cd backend && npm start",
+    "heroku-postbuild": "cd backend && npm install && cd ../frontend && npm install && npm run build",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "start:backend": "cd backend && npm start",
     "start:frontend": "cd frontend && npm start",
@@ -27,7 +28,7 @@
     "react-big-calendar": "^1.19.4"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   },
   "keywords": [
     "ai",
