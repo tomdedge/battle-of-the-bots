@@ -16,6 +16,9 @@ export const connectSocket = (token) => {
     autoConnect: true
   });
   
+  // Expose socket globally for TTS context
+  window.auraflowSocket = socket;
+  
   return socket;
 };
 

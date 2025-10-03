@@ -3,6 +3,7 @@ import { MantineProvider, ColorSchemeScript, AppShell } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { theme } from './theme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { TTSProvider } from './contexts/TTSContext';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Header } from './components/Navigation/Header';
 import { BottomTabs } from './components/Navigation/BottomTabs';
@@ -191,9 +192,11 @@ function App() {
       <ColorSchemeScript defaultColorScheme="light" />
       <MantineProvider theme={theme} defaultColorScheme="light">
         <AuthProvider>
-          <ProtectedRoute>
-            <MainApp />
-          </ProtectedRoute>
+          <TTSProvider>
+            <ProtectedRoute>
+              <MainApp />
+            </ProtectedRoute>
+          </TTSProvider>
         </AuthProvider>
       </MantineProvider>
     </>

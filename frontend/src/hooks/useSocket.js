@@ -10,6 +10,7 @@ export const useSocket = () => {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
+  const [ttsPreferences, setTtsPreferences] = useState({});
 
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -20,8 +21,20 @@ export const useSocket = () => {
       const onDisconnect = () => setIsConnected(false);
       
       const onModels = ({ models, initialModel, user: serverUser }) => {
+        console.log('Received models event:', { models, initialModel, serverUser });
         setModels(models || []);
         setSelectedModel(initialModel);
+        // Extract TTS preferences from user data
+        if (serverUser) {
+          const ttsPrefs = {
+            tts_enabled: serverUser.tts_enabled || false,
+            tts_voice: serverUser.tts_voice || 'default',
+            tts_rate: serverUser.tts_rate || 1.0,
+            tts_pitch: serverUser.tts_pitch || 1.0
+          };
+          console.log('Setting TTS preferences:', ttsPrefs);
+          setTtsPreferences(ttsPrefs);
+        }
       };
 
       const onChatHistory = (history) => {
@@ -125,6 +138,22 @@ export const useSocket = () => {
     }
   };
 
+  const updateTTSPreferences = (preferences) => {
+    console.log('updateTTSPreferences called with:', preferences);
+    setTtsPreferences(prev => {
+      const updated = { ...prev, ...preferences };
+      console.log('TTS preferences updated from', prev, 'to', updated);
+      return updated;
+    });
+    // Force a re-render by updating the preferences again with a new object reference
+    setTimeout(() => {
+      setTtsPreferences(current => ({ ...current }));
+    }, 0);
+    if (socket && socket.connected) {
+      socket.emit('update_tts_preference', preferences);
+    }
+  };
+
   return { 
     isConnected: isConnected && isAuthenticated, 
     sendMessage, 
@@ -136,6 +165,8 @@ export const useSocket = () => {
     setChatHistory,
     clearChatHistory,
     regenerateResponse,
-    user
+    user,
+    ttsPreferences,
+    updateTTSPreferences
   };
 };

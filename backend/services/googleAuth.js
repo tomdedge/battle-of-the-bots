@@ -15,12 +15,23 @@ class GoogleAuthService {
       callbackURL: process.env.GOOGLE_REDIRECT_URI,
       accessType: 'offline',
       prompt: 'consent',
+      includeGrantedScopes: true,
       scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/tasks']
     }, this.handleGoogleCallback.bind(this)));
   }
 
   async handleGoogleCallback(accessToken, refreshToken, profile, done) {
     try {
+      console.log('Google OAuth callback received:', {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        profileId: profile.id
+      });
+      
+      if (!refreshToken) {
+        console.warn('No refresh token received from Google. This may cause authentication issues.');
+      }
+      
       // Store user and tokens in database
       const user = await dbService.createUser(profile, { accessToken, refreshToken });
       return done(null, user);

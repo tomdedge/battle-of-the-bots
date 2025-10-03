@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TTS Test</title>
+</head>
+<body>
+    <h1>TTS Test</h1>
+    <button onclick="testTTS()">Test TTS</button>
+    <button onclick="stopTTS()">Stop TTS</button>
+    
+    <script>
+        function testTTS() {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance('Hello! This is a test of the text-to-speech functionality in AuraFlow.');
+                speechSynthesis.speak(utterance);
+                console.log('TTS started');
+            } else {
+                alert('Speech synthesis not supported');
+            }
+        }
+        
+        function stopTTS() {
+            speechSynthesis.cancel();
+            console.log('TTS stopped');
+        }
+        
+        // List available voices
+        speechSynthesis.onvoiceschanged = () => {
+            const voices = speechSynthesis.getVoices();
+            console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+        };
+    </script>
+</body>
+</html>

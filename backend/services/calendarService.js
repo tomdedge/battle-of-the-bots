@@ -130,32 +130,46 @@ class CalendarService {
   }
 
   async updateEvent(userId, eventId, updateData) {
-    const calendar = await this.getAuthenticatedClient(userId);
-    const eventData = {};
-    
-    if (updateData.title) eventData.summary = updateData.title;
-    if (updateData.description) eventData.description = updateData.description;
-    if (updateData.location) eventData.location = updateData.location;
-    if (updateData.startDateTime) eventData.start = { dateTime: updateData.startDateTime };
-    if (updateData.endDateTime) eventData.end = { dateTime: updateData.endDateTime };
+    try {
+      const calendar = await this.getAuthenticatedClient(userId);
+      const eventData = {};
+      
+      if (updateData.title) eventData.summary = updateData.title;
+      if (updateData.description) eventData.description = updateData.description;
+      if (updateData.location) eventData.location = updateData.location;
+      if (updateData.startDateTime) eventData.start = { dateTime: updateData.startDateTime };
+      if (updateData.endDateTime) eventData.end = { dateTime: updateData.endDateTime };
 
-    const response = await calendar.events.update({
-      calendarId: 'primary',
-      eventId,
-      resource: eventData
-    });
-    
-    return response.data;
+      const response = await calendar.events.update({
+        calendarId: 'primary',
+        eventId,
+        resource: eventData
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (error.code === 404 || error.message.includes('Not Found')) {
+        throw new Error(`Calendar event with ID "${eventId}" not found. To update an event, you must first call calendar_get_events to get the current list of events and their valid IDs, then use the exact event ID from that response.`);
+      }
+      throw error;
+    }
   }
 
   async deleteEvent(userId, eventId) {
-    const calendar = await this.getAuthenticatedClient(userId);
-    await calendar.events.delete({
-      calendarId: 'primary',
-      eventId
-    });
-    
-    return { success: true, eventId };
+    try {
+      const calendar = await this.getAuthenticatedClient(userId);
+      await calendar.events.delete({
+        calendarId: 'primary',
+        eventId
+      });
+      
+      return { success: true, eventId };
+    } catch (error) {
+      if (error.code === 404 || error.message.includes('Not Found')) {
+        throw new Error(`Calendar event with ID "${eventId}" not found. To delete an event, you must first call calendar_get_events to get the current list of events and their valid IDs, then use the exact event ID from that response.`);
+      }
+      throw error;
+    }
   }
 }
 
