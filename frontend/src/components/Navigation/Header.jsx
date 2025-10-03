@@ -37,7 +37,7 @@ export function Header() {
           <img 
             src="/icon.jpg" 
             alt="AuraFlow" 
-            style={{ width: 32, height: 32, borderRadius: '50%' }}
+            style={{ width: 43, aspectRatio: 1, borderRadius: '50%' }}
           />
           <Title order={3} c="aura.1">AuraFlow</Title>
         </Group>
