@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Stack, Paper, LoadingOverlay, Text, Button, Group, Select } from '@mantine/core';
+import { Stack, Paper, LoadingOverlay, Text, Button, Group, Select, ScrollArea } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ApiService from '../../services/api';
@@ -116,10 +116,11 @@ export const TasksView = () => {
         </Group>
       </Paper>
 
-      <Paper flex={1} pos="relative">
+      <Paper flex={1} pos="relative" h={0}>
         <LoadingOverlay visible={loading} />
         
-        <Stack gap="md" p="md">
+        <ScrollArea h="100%">
+          <Stack gap="md" p="md">
           {showForm && (
             <TaskForm
               onSubmit={handleTaskCreate}
@@ -161,7 +162,8 @@ export const TasksView = () => {
               No tasks found. Create your first task!
             </Text>
           )}
-        </Stack>
+          </Stack>
+        </ScrollArea>
       </Paper>
     </Stack>
   );
