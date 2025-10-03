@@ -245,7 +245,7 @@ export const CalendarView = () => {
         </Text>
       )}
 
-      <Paper flex={1} pos="relative" style={{ height: 'calc(100vh - 200px)' }} p="md">
+      <Paper flex={1} pos="relative" h={0} p="md">
         <LoadingOverlay visible={loading} />
         
         <Calendar
