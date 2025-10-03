@@ -30,7 +30,9 @@ router.get('/google/callback',
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
-      res.redirect(process.env.FRONTEND_URL);
+      // Use the current host for redirect in production
+      const redirectUrl = process.env.FRONTEND_URL || `https://${req.get('host')}`;
+      res.redirect(redirectUrl);
     } else {
       res.redirect(`${process.env.FRONTEND_URL}?token=${token}`);
     }
