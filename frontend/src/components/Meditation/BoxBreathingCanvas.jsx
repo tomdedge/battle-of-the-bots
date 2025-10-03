@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Container, Title, Text, Stack, ScrollArea } from '@mantine/core';
+import { Container, Title, Text, Stack, ScrollArea, useMantineColorScheme } from '@mantine/core';
 
 export function BoxBreathingCanvas() {
   const canvasRef = useRef(null);
@@ -8,6 +8,7 @@ export function BoxBreathingCanvas() {
   const [phase, setPhase] = useState('inhale');
   const [timeLeft, setTimeLeft] = useState(4);
   const [progress, setProgress] = useState(0);
+  const { colorScheme } = useMantineColorScheme();
 
   const boxSize = 240;
   const centerX = 175;
@@ -27,17 +28,39 @@ export function BoxBreathingCanvas() {
   };
 
   const getCircleColor = () => {
+    const isDark = colorScheme === 'dark';
+    
     switch (phase) {
       case 'inhale':
-        return { fill: 'rgba(34, 197, 94, 0.2)', stroke: 'rgba(34, 197, 94, 0.4)' }; // green
+        return { 
+          fill: isDark ? 'rgba(74, 222, 128, 0.3)' : 'rgba(34, 197, 94, 0.2)', 
+          stroke: isDark ? 'rgba(74, 222, 128, 0.6)' : 'rgba(34, 197, 94, 0.4)' 
+        };
       case 'hold1':
       case 'hold2':
-        return { fill: 'rgba(249, 115, 22, 0.2)', stroke: 'rgba(249, 115, 22, 0.4)' }; // orange
+        return { 
+          fill: isDark ? 'rgba(251, 146, 60, 0.3)' : 'rgba(249, 115, 22, 0.2)', 
+          stroke: isDark ? 'rgba(251, 146, 60, 0.6)' : 'rgba(249, 115, 22, 0.4)' 
+        };
       case 'exhale':
-        return { fill: 'rgba(239, 68, 68, 0.2)', stroke: 'rgba(239, 68, 68, 0.4)' }; // red
+        return { 
+          fill: isDark ? 'rgba(248, 113, 113, 0.3)' : 'rgba(239, 68, 68, 0.2)', 
+          stroke: isDark ? 'rgba(248, 113, 113, 0.6)' : 'rgba(239, 68, 68, 0.4)' 
+        };
       default:
-        return { fill: 'rgba(99, 102, 241, 0.1)', stroke: 'rgba(99, 102, 241, 0.3)' };
+        return { 
+          fill: isDark ? 'rgba(129, 140, 248, 0.2)' : 'rgba(99, 102, 241, 0.1)', 
+          stroke: isDark ? 'rgba(129, 140, 248, 0.4)' : 'rgba(99, 102, 241, 0.3)' 
+        };
     }
+  };
+
+  const getBoxStrokeColor = () => {
+    return colorScheme === 'dark' ? '#8b5cf6' : '#6366f1';
+  };
+
+  const getTextColor = () => {
+    return colorScheme === 'dark' ? '#f1f5f9' : '#fff';
   };
 
   useEffect(() => {
@@ -60,7 +83,7 @@ export function BoxBreathingCanvas() {
 
     if (!isActive && progress === 0) {
       // Draw starting point
-      ctx.strokeStyle = '#6366f1';
+      ctx.strokeStyle = getBoxStrokeColor();
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(centerX - boxSize/2, centerY + boxSize/2, 3, 0, 2 * Math.PI);
@@ -68,7 +91,7 @@ export function BoxBreathingCanvas() {
       return;
     }
 
-    ctx.strokeStyle = '#6366f1';
+    ctx.strokeStyle = getBoxStrokeColor();
     ctx.lineWidth = 9;
     ctx.lineCap = 'round';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
@@ -113,7 +136,7 @@ export function BoxBreathingCanvas() {
     }
 
     ctx.stroke();
-  }, [phase, progress, isActive]);
+  }, [phase, progress, isActive, colorScheme]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -169,7 +192,14 @@ export function BoxBreathingCanvas() {
   };
 
   return (
-    <Stack h="100%" gap={0}>
+    <Stack 
+      h="100%" 
+      gap={0}
+      style={{ 
+        backgroundColor: 'var(--mantine-color-body)',
+        overflow: 'hidden'
+      }}
+    >
       <div 
         style={{ 
           flex: 1, 
@@ -208,14 +238,14 @@ export function BoxBreathingCanvas() {
               pointerEvents: 'none'
             }}>
               <Title order={3} style={{ 
-                color: '#fff', 
+                color: getTextColor(), 
                 textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
                 marginBottom: '8px'
               }}>
                 {getPhaseText()}
               </Title>
               <Text style={{ 
-                color: '#fff', 
+                color: getTextColor(), 
                 fontSize: '4rem',
                 fontWeight: 700,
                 textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',

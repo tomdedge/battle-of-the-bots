@@ -33,8 +33,8 @@ class ApiService {
     return response.json();
   }
 
-  async analyzeCalendar(date) {
-    const response = await fetch(`${this.baseURL}/api/calendar/analyze?date=${date}`, {
+  async analyzeCalendar(date, days = 1) {
+    const response = await fetch(`${this.baseURL}/api/calendar/analyze?date=${date}&days=${days}`, {
       headers: { 'Authorization': `Bearer ${this.token}` }
     });
     return response.json();

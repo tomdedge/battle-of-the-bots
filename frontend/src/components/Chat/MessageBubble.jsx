@@ -70,7 +70,7 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
               src={avatarSrc}
               size="md" 
               color="aura"
-              style={{ border: '1px solid #1D9BBB' }}
+              style={{ border: '2px solid #1D9BBB' }}
             >
               {getUserInitials(user?.name)}
             </Avatar>

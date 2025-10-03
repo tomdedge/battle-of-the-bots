@@ -30,14 +30,33 @@ router.get('/events', async (req, res) => {
 
 router.get('/analyze', async (req, res) => {
   try {
-    const { date } = req.query;
-    const gaps = await calendarService.analyzeCalendarGaps(
-      req.user.userId, 
-      date ? new Date(date) : new Date()
-    );
-    const suggestions = gaps.map(gap => calendarService.suggestFocusBlock(gap));
-    res.json({ gaps, suggestions });
+    const { date, days = 1 } = req.query;
+    const baseDate = date ? new Date(date) : new Date();
+    const daysToAnalyze = Math.min(parseInt(days) || 1, 7); // Limit to 7 days max
+    
+    console.log(`Analyzing ${daysToAnalyze} days starting from ${baseDate.toDateString()}`);
+    
+    const allGaps = [];
+    const allSuggestions = [];
+    
+    for (let i = 0; i < daysToAnalyze; i++) {
+      const currentDate = new Date(baseDate);
+      currentDate.setDate(baseDate.getDate() + i);
+      
+      const gaps = await calendarService.analyzeCalendarGaps(req.user.userId, currentDate);
+      const suggestions = gaps.map(gap => ({
+        ...calendarService.suggestFocusBlock(gap),
+        date: currentDate.toDateString()
+      }));
+      
+      allGaps.push(...gaps);
+      allSuggestions.push(...suggestions);
+    }
+    
+    console.log(`Total suggestions across ${daysToAnalyze} days: ${allSuggestions.length}`);
+    res.json({ gaps: allGaps, suggestions: allSuggestions });
   } catch (error) {
+    console.error('Calendar analysis error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -9,10 +9,14 @@ COMPLETED:
 ✅ Add the user Avatar Profile image thing that is next to their messages also by the "Signed in as "
 in the sidebar menu
 ✅ Make the "Menu" text/title visually distinguished from other text in the sidebar
+✅ Re assess the AI focus time calendar suggestions - Fixed multiple issues: expanded time window (7 AM - 9 PM), reduced minimum duration (15 min), added multi-day analysis, improved gap detection logic, shows suggestions in week view, respects current time, added better logging and more descriptive titles
+✅ Use frontend/public/icon.jpg as favicon - Generated favicon.ico with multiple sizes (16x16, 32x32, 48x48) and added to HTML
+✅ Use frontend/public/icon.jpg as app icons referenced in manifest.json - Generated 192x192 and 512x512 PNG icons, updated manifest
+✅ Remove the usage of emojis - Removed all emoji usage from components and tests
+✅ Ensure text "Dashed events are focus block..." responds correctly to light/dark mode - Changed to use Mantine's `c="dimmed"` prop for proper theme support
+✅ The meditation tab does not support dark mode. The background (including the canvas background (which can probably be transparent)) needs to be like the other tab backgrounds in dark mode. The canvas shape colors should also be adjusted for dark mode to a lighter color for each shape.
 
 TODO:
-- Re assess the AI focus time calendar suggestions. It doesn't seem to be working.
-There should be more suggestions than what are visible on my calendar
 
 
 Tech Debt:

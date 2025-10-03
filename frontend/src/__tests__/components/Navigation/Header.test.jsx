@@ -31,8 +31,8 @@ jest.mock('@mantine/hooks', () => ({
 
 // Mock Tabler icons
 jest.mock('@tabler/icons-react', () => ({
-  IconSun: () => <span data-testid="sun-icon">☀️</span>,
-  IconMoon: () => <span data-testid="moon-icon">🌙</span>,
+  IconSun: () => <span data-testid="sun-icon">Sun</span>,
+  IconMoon: () => <span data-testid="moon-icon">Moon</span>,
   IconMenu2: () => <span data-testid="menu-icon">☰</span>,
   IconLogout: () => <span data-testid="logout-icon">🚪</span>,
 }));

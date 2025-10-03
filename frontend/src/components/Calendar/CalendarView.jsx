@@ -33,9 +33,12 @@ export const CalendarView = () => {
       const api = new ApiService(token);
       const { start, end } = getDateRange(date, view);
       
+      // Determine how many days to analyze based on view
+      const daysToAnalyze = view === 'month' ? 7 : view === 'week' ? 7 : 3;
+      
       const [eventsResponse, analysisResponse] = await Promise.all([
         api.getCalendarEvents(start.toISOString(), end.toISOString()),
-        api.analyzeCalendar(date.toISOString().split('T')[0])
+        api.analyzeCalendar(date.toISOString().split('T')[0], daysToAnalyze)
       ]);
 
       // Transform actual events
@@ -47,8 +50,8 @@ export const CalendarView = () => {
         type: 'actual'
       }));
 
-      // Transform suggestions into ghost events (only for day view)
-      const suggestionEvents = view === 'day' 
+      // Transform suggestions into ghost events (show in day and week views)
+      const suggestionEvents = (view === 'day' || view === 'week')
         ? (analysisResponse.suggestions || []).map(suggestion => ({
             start: new Date(suggestion.start.dateTime),
             end: new Date(suggestion.end.dateTime),
@@ -57,6 +60,8 @@ export const CalendarView = () => {
             suggestion: suggestion
           }))
         : [];
+
+      console.log(`Loaded ${actualEvents.length} actual events and ${suggestionEvents.length} suggestions`);
 
       // Combine actual events and suggestions
       setEvents([...actualEvents, ...suggestionEvents]);
@@ -250,9 +255,9 @@ export const CalendarView = () => {
           </Button>
         )}
 
-        {suggestions.length > 0 && view === 'day' && (
-          <Text size="sm" ta="center" style={{ color: 'var(--mantine-color-gray-7)' }} m="md">
-            💡 Dashed events are focus block suggestions - click to add to calendar
+        {suggestions.length > 0 && (view === 'day' || view === 'week') && (
+          <Text size="sm" ta="center" c="dimmed" m="md">
+            Dashed events are focus block suggestions ({suggestions.length} found) - click to add to calendar
           </Text>
         )}
       </Box>

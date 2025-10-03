@@ -11,11 +11,25 @@ class CalendarService {
   }
 
   suggestFocusBlock(gap, taskContext = '') {
+    const duration = Math.floor(gap.duration);
+    let title = `Focus Block`;
+    
+    // Add duration-based context
+    if (duration >= 60) {
+      title = `Deep Focus Session`;
+    } else if (duration >= 45) {
+      title = `Focus Block`;
+    } else if (duration >= 25) {
+      title = `Pomodoro Session`;
+    } else {
+      title = `Quick Focus`;
+    }
+    
     return {
-      title: `Focus Block - ${Math.floor(gap.duration)} min`,
+      title: `${title} (${duration} min)`,
       start: { dateTime: gap.start.toISOString() },
       end: { dateTime: gap.end.toISOString() },
-      description: `Suggested focus time${taskContext ? `. Context: ${taskContext}` : ''}`,
+      description: `AI-suggested focus time${taskContext ? `. Context: ${taskContext}` : ''}. Duration: ${duration} minutes.`,
       colorId: '2'
     };
   }
@@ -79,31 +93,70 @@ class CalendarService {
   }
 
   async analyzeCalendarGaps(userId, date = new Date()) {
+    const now = new Date();
     const startOfDay = new Date(date);
-    startOfDay.setHours(8, 0, 0, 0);
-    
     const endOfDay = new Date(date);
-    endOfDay.setHours(18, 0, 0, 0);
+    
+    // Expand time window: 7 AM - 9 PM
+    startOfDay.setHours(7, 0, 0, 0);
+    endOfDay.setHours(21, 0, 0, 0);
+    
+    // If analyzing today, start from current time if it's later than 7 AM
+    if (date.toDateString() === now.toDateString() && now > startOfDay) {
+      startOfDay.setTime(now.getTime());
+    }
+
+    console.log('Analyzing calendar gaps:', {
+      userId,
+      date: date.toISOString(),
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+      isToday: date.toDateString() === now.toDateString()
+    });
 
     const events = await this.getEvents(userId, startOfDay.toISOString(), endOfDay.toISOString());
+    console.log(`Found ${events.length} events for gap analysis`);
+    
     const gaps = this.findTimeGaps(events, startOfDay, endOfDay);
-    return gaps.filter(gap => gap.duration >= 25);
+    console.log(`Found ${gaps.length} potential gaps`);
+    
+    // Reduce minimum duration to 15 minutes for more suggestions
+    const filteredGaps = gaps.filter(gap => gap.duration >= 15);
+    console.log(`${filteredGaps.length} gaps meet minimum duration (15 min)`);
+    
+    return filteredGaps;
   }
 
   findTimeGaps(events, startTime, endTime) {
     const gaps = [];
     let currentTime = new Date(startTime);
 
-    const sortedEvents = events.sort((a, b) => 
-      new Date(a.start.dateTime || a.start.date) - new Date(b.start.dateTime || b.start.date)
+    // Filter out all-day events and sort by start time
+    const timedEvents = events.filter(event => 
+      event.start.dateTime && event.end.dateTime
+    );
+    
+    const sortedEvents = timedEvents.sort((a, b) => 
+      new Date(a.start.dateTime) - new Date(b.start.dateTime)
     );
 
+    console.log(`Processing ${sortedEvents.length} timed events for gaps`);
+
     for (const event of sortedEvents) {
-      const eventStart = new Date(event.start.dateTime || event.start.date);
+      const eventStart = new Date(event.start.dateTime);
+      const eventEnd = new Date(event.end.dateTime);
       
+      // Skip events that have already ended
+      if (eventEnd <= currentTime) {
+        continue;
+      }
+      
+      // If event starts after current time, there's a gap
       if (currentTime < eventStart) {
         const gapDuration = (eventStart - currentTime) / (1000 * 60);
-        if (gapDuration >= 25) {
+        console.log(`Found gap: ${currentTime.toISOString()} to ${eventStart.toISOString()} (${gapDuration} min)`);
+        
+        if (gapDuration >= 15) {
           gaps.push({
             start: new Date(currentTime),
             end: new Date(eventStart),
@@ -112,12 +165,16 @@ class CalendarService {
         }
       }
       
-      currentTime = new Date(event.end.dateTime || event.end.date);
+      // Move current time to end of this event (or keep it if event ends before current time)
+      currentTime = new Date(Math.max(currentTime.getTime(), eventEnd.getTime()));
     }
 
+    // Check for final gap until end of day
     if (currentTime < endTime) {
       const finalGapDuration = (endTime - currentTime) / (1000 * 60);
-      if (finalGapDuration >= 25) {
+      console.log(`Found final gap: ${currentTime.toISOString()} to ${endTime.toISOString()} (${finalGapDuration} min)`);
+      
+      if (finalGapDuration >= 15) {
         gaps.push({
           start: new Date(currentTime),
           end: new Date(endTime),
@@ -126,6 +183,7 @@ class CalendarService {
       }
     }
 
+    console.log(`Total gaps found: ${gaps.length}`);
     return gaps;
   }
 
