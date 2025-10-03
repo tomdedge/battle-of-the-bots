@@ -13,16 +13,24 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
       style={{
         display: 'flex',
         justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: '8px'
+        marginBottom: '8px',
+        width: '100%'
       }}
     >
-      <Group gap="xs" align="flex-start">
+      <Box
+        style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'flex-start',
+          flexDirection: isUser ? 'row-reverse' : 'row',
+          maxWidth: '80%'
+        }}
+      >
         {isUser && (
           <Avatar 
             src={user?.picture}
             size="sm" 
             color="aura"
-            style={{ order: 2 }}
           >
             {getUserInitials(user?.name)}
           </Avatar>
@@ -30,16 +38,15 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
         
         <Paper
           style={{
-            maxWidth: '80%',
             backgroundColor: isUser 
               ? 'var(--mantine-color-aura-1)' 
               : error 
                 ? 'var(--mantine-color-red-1)'
                 : 'var(--mantine-color-gray-1)',
             color: isUser ? 'white' : 'var(--mantine-color-text)',
-            order: isUser ? 1 : 2,
             position: 'relative',
-            padding: messageId && (onDelete || onRegenerate) ? '12px 32px 12px 12px' : '12px'
+            padding: messageId && (onDelete || onRegenerate) ? '12px 32px 12px 12px' : '12px',
+            minWidth: '120px'
           }}
         >
           <ReactMarkdown>{message}</ReactMarkdown>
@@ -88,7 +95,7 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
             </Menu>
           )}
         </Paper>
-      </Group>
+      </Box>
     </Box>
   );
 };
