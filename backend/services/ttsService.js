@@ -24,18 +24,46 @@ class TTSService {
     }
 
     return new Promise((resolve) => {
+      // Try edge-tts command first
       const edgeTTS = spawn('edge-tts', ['--help']);
       
       edgeTTS.on('close', (code) => {
-        this.edgeTTSAvailable = code === 0;
-        console.log(`edge-tts availability: ${this.edgeTTSAvailable}`);
-        resolve(this.edgeTTSAvailable);
+        if (code === 0) {
+          this.edgeTTSAvailable = true;
+          this.edgeTTSCommand = 'edge-tts';
+          console.log(`edge-tts availability: ${this.edgeTTSAvailable}`);
+          resolve(this.edgeTTSAvailable);
+        } else {
+          // Try python module fallback
+          const pythonTTS = spawn('python3', ['-m', 'edge_tts', '--help']);
+          pythonTTS.on('close', (pythonCode) => {
+            this.edgeTTSAvailable = pythonCode === 0;
+            this.edgeTTSCommand = pythonCode === 0 ? ['python3', '-m', 'edge_tts'] : null;
+            console.log(`edge-tts availability: ${this.edgeTTSAvailable} (using ${this.edgeTTSCommand})`);
+            resolve(this.edgeTTSAvailable);
+          });
+          pythonTTS.on('error', () => {
+            this.edgeTTSAvailable = false;
+            console.log('edge-tts not available, will use fallback');
+            resolve(false);
+          });
+        }
       });
 
       edgeTTS.on('error', () => {
-        this.edgeTTSAvailable = false;
-        console.log('edge-tts not available, will use fallback');
-        resolve(false);
+        // Try python module fallback
+        const pythonTTS = spawn('python3', ['-m', 'edge_tts', '--help']);
+        pythonTTS.on('close', (pythonCode) => {
+          this.edgeTTSAvailable = pythonCode === 0;
+          this.edgeTTSCommand = pythonCode === 0 ? ['python3', '-m', 'edge_tts'] : null;
+          console.log(`edge-tts availability: ${this.edgeTTSAvailable} (using python module)`);
+          resolve(this.edgeTTSAvailable);
+        });
+        pythonTTS.on('error', () => {
+          this.edgeTTSAvailable = false;
+          console.log('edge-tts not available, will use fallback');
+          resolve(false);
+        });
       });
     });
   }
@@ -71,11 +99,15 @@ class TTSService {
     const outputFile = path.join(this.tempDir, `tts_${Date.now()}.mp3`);
     
     return new Promise((resolve, reject) => {
-      const edgeTTS = spawn('edge-tts', [
+      const args = [
         '--voice', voice,
         '--text', text,
         '--write-media', outputFile
-      ]);
+      ];
+      
+      const edgeTTS = Array.isArray(this.edgeTTSCommand) 
+        ? spawn(this.edgeTTSCommand[0], [...this.edgeTTSCommand.slice(1), ...args])
+        : spawn(this.edgeTTSCommand, args);
 
       let stderr = '';
       edgeTTS.stderr.on('data', (data) => {
@@ -162,7 +194,10 @@ class TTSService {
 
   async getEdgeTTSVoices() {
     return new Promise((resolve, reject) => {
-      const edgeTTS = spawn('edge-tts', ['--list-voices']);
+      const args = ['--list-voices'];
+      const edgeTTS = Array.isArray(this.edgeTTSCommand) 
+        ? spawn(this.edgeTTSCommand[0], [...this.edgeTTSCommand.slice(1), ...args])
+        : spawn(this.edgeTTSCommand, args);
       let output = '';
 
       edgeTTS.stdout.on('data', (data) => {

@@ -8,7 +8,7 @@
     "migrate": "node db/migrate.js",
     "migrate-old": "node migrate.js",
     "test-messages": "node test_new_messages.js",
-    "install-tts": "pip3 install -r requirements.txt || echo 'Python dependencies installation failed, TTS will use fallback'",
+    "install-tts": "echo 'Installing Python dependencies...' && pip3 install -r requirements.txt && echo 'edge-tts installed successfully!' || (echo 'ERROR: Python dependencies installation failed. Try: pip3 install edge-tts' && exit 0)",
     "postinstall": "npm run install-tts"
   },
   "dependencies": {
