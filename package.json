@@ -26,8 +26,8 @@
     "react-big-calendar": "^1.19.4"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "node": "18.x",
+    "npm": "9.x"
   },
   "keywords": [
     "ai",
