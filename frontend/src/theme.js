@@ -1,6 +1,10 @@
 import { createTheme } from '@mantine/core';
 
 export const theme = createTheme({
+  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+  headings: {
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+  },
   colors: {
     aura: [
       '#EFE2D3', // 0 - background light
@@ -18,9 +22,12 @@ export const theme = createTheme({
   primaryColor: 'aura',
   primaryShade: 1,
   other: {
-    backgroundLight: 'rgba(255, 255, 255, 1)',
-    backgroundDark: '#2D1B21', // Darker background for better contrast
-    textLight: '#2D1B21', // Darker text for better contrast
-    textDark: '#EFE2D3'
+    backgroundLight: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+    backgroundDark: 'linear-gradient(135deg, #2D1B21 0%, #1a1a1a 100%)',
+    textLight: '#2D1B21',
+    textDark: '#EFE2D3',
+    userBubbleGradient: 'linear-gradient(135deg, #0A8FA8 0%, #1D9BBB 100%)',
+    auraBubbleGradient: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+    auraBubbleGradientDark: 'linear-gradient(135deg, #495057 0%, #6c757d 100%)'
   }
 });

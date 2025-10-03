@@ -34,14 +34,6 @@ export function Header() {
     <>
       <Group justify="space-between" h="100%" px="md">
         <Group>
-          <ActionIcon
-            variant="outline"
-            color="aura.1"
-            onClick={open}
-            size="lg"
-          >
-            <IconMenu2 size={18} />
-          </ActionIcon>
           <img 
             src="/icon.jpg" 
             alt="AuraFlow" 
@@ -50,17 +42,27 @@ export function Header() {
           <Title order={3} c="aura.1">AuraFlow</Title>
         </Group>
         
-        <ActionIcon
-          variant="outline"
-          color="aura.1"
-          onClick={() => toggleColorScheme()}
-          size="lg"
-        >
-          {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
-        </ActionIcon>
+        <Group>
+          <ActionIcon
+            variant="outline"
+            color="aura.1"
+            onClick={() => toggleColorScheme()}
+            size="lg"
+          >
+            {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+          </ActionIcon>
+          <ActionIcon
+            variant="outline"
+            color="aura.1"
+            onClick={open}
+            size="lg"
+          >
+            <IconMenu2 size={18} />
+          </ActionIcon>
+        </Group>
       </Group>
 
-      <Drawer opened={opened} onClose={close} title="Menu" position="left">
+      <Drawer opened={opened} onClose={close} title="Menu" position="right">
         <Stack gap="md">
           <Text size="sm" fw={500}>
             Signed in as {user?.name}

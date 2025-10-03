@@ -111,13 +111,13 @@ export const ChatInterface = () => {
         display: 'flex', 
         flexDirection: 'column',
         backgroundColor: 'var(--mantine-color-body)',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
       <ScrollArea 
         h={0}
         style={{ flex: 1 }} 
-        pt="md" 
+        pt="md"
         ref={scrollAreaRef}
         viewportProps={{
           style: { backgroundColor: 'var(--mantine-color-body)' }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Stack, Paper, LoadingOverlay, Text, Button, Group, Select, ScrollArea } from '@mantine/core';
+import { Stack, Paper, LoadingOverlay, Text, Button, Group, Select, ScrollArea, Box } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ApiService from '../../services/api';
@@ -94,33 +94,35 @@ export const TasksView = () => {
   const completedTasks = tasks.filter(task => task.status === 'completed');
 
   return (
-    <Stack h="100%" gap="md" p="md">
-      <Paper p="md">
-        <Group justify="space-between">
-          <Select
-            placeholder="Select task list"
-            value={selectedListId}
-            onChange={setSelectedListId}
-            data={taskLists.map(list => ({
-              value: list.id,
-              label: list.title
-            }))}
-            style={{ flex: 1 }}
-          />
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={() => setShowForm(true)}
-          >
-            Add Task
-          </Button>
-        </Group>
-      </Paper>
+    <Stack h="100%" gap={0}>
+      <Box pb={0}>
+        <Paper p="md">
+          <Group justify="space-between">
+            <Select
+              placeholder="Select task list"
+              value={selectedListId}
+              onChange={setSelectedListId}
+              data={taskLists.map(list => ({
+                value: list.id,
+                label: list.title
+              }))}
+              style={{ flex: 1 }}
+            />
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => setShowForm(true)}
+            >
+              Add Task
+            </Button>
+          </Group>
+        </Paper>
+      </Box>
 
-      <Paper flex={1} pos="relative" h={0}>
-        <LoadingOverlay visible={loading} />
-        
-        <ScrollArea h="100%">
-          <Stack gap="md" p="md">
+      <ScrollArea h={0} style={{ flex: 1 }} p="md" pt={0}>
+        <Paper pos="relative">
+          <LoadingOverlay visible={loading} />
+          
+          <Stack gap="md">
           {showForm && (
             <TaskForm
               onSubmit={handleTaskCreate}
@@ -163,8 +165,8 @@ export const TasksView = () => {
             </Text>
           )}
           </Stack>
-        </ScrollArea>
-      </Paper>
+        </Paper>
+      </ScrollArea>
     </Stack>
   );
 };

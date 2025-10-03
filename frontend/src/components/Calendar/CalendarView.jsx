@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Stack, SegmentedControl, Paper, LoadingOverlay, Text, Group, Button, ActionIcon, Popover, Alert } from '@mantine/core';
+import { Stack, SegmentedControl, Paper, LoadingOverlay, Text, Group, Button, ActionIcon, Popover, Alert, ScrollArea, Box } from '@mantine/core';
 import { DatePicker } from '@mantine/dates';
 import { IconChevronLeft, IconChevronRight, IconCalendar, IconAlertCircle } from '@tabler/icons-react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
@@ -162,109 +162,113 @@ export const CalendarView = () => {
   };
 
   return (
-    <Stack h="100%" gap="lg">
-      <Paper p="md">
-        <Group justify="space-between" align="center" wrap="nowrap">
-          <ActionIcon 
-            variant="subtle" 
-            onClick={() => navigateDate('prev')}
-            size="lg"
-          >
-            <IconChevronLeft size={18} />
-          </ActionIcon>
+    <Stack h="100%" gap={0}>
+      <Box p="md" pb={0}>
+        <Paper>
+          <Group justify="space-between" align="center" wrap="nowrap">
+            <ActionIcon 
+              variant="subtle" 
+              onClick={() => navigateDate('prev')}
+              size="lg"
+            >
+              <IconChevronLeft size={18} />
+            </ActionIcon>
+            
+            <Text fw={500} size="lg" style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+              {getDateLabel()}
+            </Text>
+            
+            <ActionIcon 
+              variant="subtle" 
+              onClick={() => navigateDate('next')}
+              size="lg"
+            >
+              <IconChevronRight size={18} />
+            </ActionIcon>
+          </Group>
           
-          <Text fw={500} size="lg" style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            {getDateLabel()}
-          </Text>
+          <Group justify="center" mt="sm" gap="sm">
+            <Button variant="light" onClick={() => navigateDate('today')}>
+              Today
+            </Button>
+            <Popover width={300} position="bottom" withArrow shadow="md">
+              <Popover.Target>
+                <ActionIcon variant="subtle" size="lg">
+                  <IconCalendar size={18} />
+                </ActionIcon>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <DatePicker
+                  value={date}
+                  onChange={(newDate) => newDate && setDate(newDate)}
+                />
+              </Popover.Dropdown>
+            </Popover>
+          </Group>
           
-          <ActionIcon 
-            variant="subtle" 
-            onClick={() => navigateDate('next')}
-            size="lg"
+          <SegmentedControl
+            value={view}
+            onChange={setView}
+            data={[
+              { label: 'Month', value: 'month' },
+              { label: 'Week', value: 'week' },
+              { label: 'Day', value: 'day' },
+              { label: 'Agenda', value: 'agenda' }
+            ]}
+            fullWidth
+            mt="md"
+          />
+        </Paper>
+
+        {error && (
+          <Button 
+            variant="default" 
+            leftSection={<IconAlertCircle size={16} />}
+            onClick={loadCalendarData}
+            fullWidth
+            mt="md"
+            style={{ 
+              height: 'auto', 
+              padding: '12px',
+              textAlign: 'center',
+              whiteSpace: 'pre-line',
+              backgroundColor: '#fca5a5',
+              borderColor: '#f87171',
+              color: '#7f1d1d'
+            }}
           >
-            <IconChevronRight size={18} />
-          </ActionIcon>
-        </Group>
-        
-        <Group justify="center" mt="sm" gap="sm">
-          <Button variant="light" onClick={() => navigateDate('today')}>
-            Today
+            Failed to load calendar data.{'\n'}Click here to try again.
           </Button>
-          <Popover width={300} position="bottom" withArrow shadow="md">
-            <Popover.Target>
-              <ActionIcon variant="subtle" size="lg">
-                <IconCalendar size={18} />
-              </ActionIcon>
-            </Popover.Target>
-            <Popover.Dropdown>
-              <DatePicker
-                value={date}
-                onChange={(newDate) => newDate && setDate(newDate)}
-              />
-            </Popover.Dropdown>
-          </Popover>
-        </Group>
-        
-        <SegmentedControl
-          value={view}
-          onChange={setView}
-          data={[
-            { label: 'Month', value: 'month' },
-            { label: 'Week', value: 'week' },
-            { label: 'Day', value: 'day' },
-            { label: 'Agenda', value: 'agenda' }
-          ]}
-          fullWidth
-          mt="md"
-        />
-      </Paper>
+        )}
 
-      {error && (
-        <Button 
-          variant="default" 
-          leftSection={<IconAlertCircle size={16} />}
-          onClick={loadCalendarData}
-          fullWidth
-          style={{ 
-            height: 'auto', 
-            padding: '12px',
-            textAlign: 'center',
-            whiteSpace: 'pre-line',
-            backgroundColor: '#fca5a5',
-            borderColor: '#f87171',
-            color: '#7f1d1d'
-          }}
-        >
-          Failed to load calendar data.{'\n'}Click here to try again.
-        </Button>
-      )}
+        {suggestions.length > 0 && view === 'day' && (
+          <Text size="sm" ta="center" style={{ color: 'var(--mantine-color-gray-7)' }} m="md">
+            💡 Dashed events are focus block suggestions - click to add to calendar
+          </Text>
+        )}
+      </Box>
 
-      {suggestions.length > 0 && view === 'day' && (
-        <Text size="sm" ta="center" style={{ color: 'var(--mantine-color-gray-7)' }}>
-          💡 Dashed events are focus block suggestions - click to add to calendar
-        </Text>
-      )}
-
-      <Paper flex={1} pos="relative" h={0} p="md">
-        <LoadingOverlay visible={loading} />
-        
-        <Calendar
-          localizer={localizer}
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          titleAccessor="title"
-          view={view}
-          onView={setView}
-          date={date}
-          onNavigate={setDate}
-          onSelectEvent={handleEventClick}
-          eventPropGetter={eventStyleGetter}
-          formats={customFormats}
-          style={{ height: '100%' }}
-          components={{}}
-        />
-      </Paper>
+      <ScrollArea h={0} style={{ flex: 1 }} p="md" pt={0}>
+        <Paper pos="relative">
+          <LoadingOverlay visible={loading} />
+          <Calendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            titleAccessor="title"
+            view={view}
+            onView={setView}
+            date={date}
+            onNavigate={setDate}
+            onSelectEvent={handleEventClick}
+            eventPropGetter={eventStyleGetter}
+            formats={customFormats}
+            style={{ height: '100%' }}
+            components={{}}
+          />
+        </Paper>
+      </ScrollArea>
     </Stack>
   );
 };

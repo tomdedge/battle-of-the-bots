@@ -1,10 +1,11 @@
-import { Paper, Text, Box, Avatar, Group, Menu, ActionIcon } from '@mantine/core';
+import { Paper, Text, Box, Avatar, Group, Menu, ActionIcon, useMantineColorScheme } from '@mantine/core';
 import { IconDots, IconTrash, IconRefresh, IconVolume, IconPlayerStop } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import { useTTS } from '../../contexts/TTSContext';
 
 export const MessageBubble = ({ message, isUser, timestamp, error, user, messageId, onDelete, onRegenerate }) => {
   const { speakText, stopSpeaking, isPlaying, isSupported, preferences } = useTTS();
+  const { colorScheme } = useMantineColorScheme();
   
   const getUserInitials = (name) => {
     if (!name) return 'U';
@@ -16,7 +17,7 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
       style={{
         display: 'flex',
         justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: '8px',
+        marginBottom: '16px',
         width: '100%'
       }}
     >
@@ -26,7 +27,7 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
           gap: '8px',
           alignItems: 'flex-start',
           flexDirection: isUser ? 'row-reverse' : 'row',
-          maxWidth: '100%',
+          width: '100%',
           padding: '0 8px',
         }}
       >
@@ -72,14 +73,19 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
         <Paper
           style={{
             flex: 1,
-            backgroundColor: isUser 
-              ? 'var(--mantine-color-aura-1)' 
+            background: isUser 
+              ? 'linear-gradient(135deg, #0A8FA8 0%, #1D9BBB 100%)' 
               : error 
                 ? 'var(--mantine-color-red-1)'
-                : 'var(--mantine-color-gray-1)',
+                : colorScheme === 'dark' 
+                  ? 'linear-gradient(135deg, #495057 0%, #6c757d 100%)'
+                  : 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
             color: isUser ? 'white' : 'var(--mantine-color-text)',
             position: 'relative',
             padding: '8px 12px',
+            boxShadow: isUser 
+              ? 'inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.1)'
+              : 'inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.1)',
           }}
         >
           <ReactMarkdown 
@@ -90,7 +96,7 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
             {message}
           </ReactMarkdown>
           {timestamp && (
-            <Text size="xs" c={isUser ? "rgba(255,255,255,0.7)" : "dimmed"} mt={8}>
+            <Text size="xs" c={isUser ? "rgba(255,255,255,0.7)" : colorScheme === 'dark' ? "rgba(255,255,255,0.6)" : "dimmed"} mt={8}>
               {new Date(timestamp).toLocaleTimeString()}
             </Text>
           )}

@@ -160,7 +160,7 @@ function MainApp() {
       header={{ height: 60 }}
       padding={0}
       style={{
-        backgroundColor: colorScheme === 'dark' ? theme.other.backgroundDark : theme.other.backgroundLight,
+        background: colorScheme === 'dark' ? theme.other.backgroundDark : theme.other.backgroundLight,
         minHeight: '100vh'
       }}
     >

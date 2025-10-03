@@ -151,7 +151,7 @@ export const MindfulnessSuggestionModal = ({
             </Group>
           </Stack>
         ) : (
-          <Group justify="space-between">
+          <Stack align="center" gap="md">
             <Button
               variant="subtle"
               leftSection={<IconX size={16} />}
@@ -160,24 +160,35 @@ export const MindfulnessSuggestionModal = ({
               Don't ask again today
             </Button>
             
-            <Group gap="sm">
+            <Group gap="sm" grow align="stretch" w="100%">
               <Button
                 variant="outline"
                 leftSection={<IconClock size={16} />}
                 onClick={handleModifyTime}
+                size="md"
+                fz="sm"
+                styles={{ 
+                  label: { whiteSpace: 'normal' },
+                  root: { flex: 1 }
+                }}
               >
-                Modify time
+                Modify
               </Button>
               
               <Button
                 leftSection={<IconCalendarPlus size={16} />}
                 onClick={handleSchedule}
                 size="md"
+                fz="sm"
+                styles={{ 
+                  label: { whiteSpace: 'normal' },
+                  root: { flex: 1 }
+                }}
               >
-                Schedule this
+                Schedule
               </Button>
             </Group>
-          </Group>
+          </Stack>
         )}
       </Stack>
     </Modal>
