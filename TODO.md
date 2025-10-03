@@ -15,8 +15,19 @@ in the sidebar menu
 ✅ Remove the usage of emojis - Removed all emoji usage from components and tests
 ✅ Ensure text "Dashed events are focus block..." responds correctly to light/dark mode - Changed to use Mantine's `c="dimmed"` prop for proper theme support
 ✅ The meditation tab does not support dark mode. The background (including the canvas background (which can probably be transparent)) needs to be like the other tab backgrounds in dark mode. The canvas shape colors should also be adjusted for dark mode to a lighter color for each shape.
+✅ Implement Focus Session Management - Created SessionTimer component with start/pause/stop controls, integrated with calendar suggestions, added session completion celebrations, and basic session history tracking
 
 TODO:
+
+- Push notifications for all upcoming calendar events (15 min before event)
+	- 15 min could be configurable via preferences stored in db
+- Button in header to start a focus session. Visible timer in header along side 'stop' button
+when session is active. Track session time in database to provide analytics on total time in focus session
+per day/week/month and to allow AI to analyze trends to display them on a dashboard and to be better at
+suggesting focus times in the future.
+- persist the users active tab across refreshes.
+- cache suggestions for different views to prevent unnecessary calls to the analyze endpoint.
+- button on tasks tab to 'schedule all tasks' and a button for each task to 'schedule task' that will ask Aurora (AI Agent) to find a time in the calendar and schedule the task as an event of the same title. Instruct aurora to default to 30 min duration (suggest other defaults) unless a more appropriate alternative to the default is apparent from the task. Once Aurora has scheduled the task, have her update the task title to include a [Scheduled] tag, then show her response to the user in a modal. The modal should show her Avatar next to a speech bubble with her real response. Construct the prompt to facilitate this desired outcome as best as possible.
 
 ## 🎯 Core Product Vision (From Spec)
 - Implement Focus Session Management - Transform calendar blocks into executable timed sessions with start/pause/stop controls

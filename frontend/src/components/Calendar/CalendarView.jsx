@@ -6,6 +6,8 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import { useAuth } from '../../contexts/AuthContext';
 import ApiService from '../../services/api';
+import { SessionTimer } from '../Session/SessionTimer';
+import { SuggestionConfirmModal } from './SuggestionConfirmModal';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import './CalendarView.css';
 
@@ -18,6 +20,8 @@ export const CalendarView = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(null);
   const { token } = useAuth();
 
   useEffect(() => {
@@ -33,13 +37,8 @@ export const CalendarView = () => {
       const api = new ApiService(token);
       const { start, end } = getDateRange(date, view);
       
-      // Determine how many days to analyze based on view
-      const daysToAnalyze = view === 'month' ? 7 : view === 'week' ? 7 : 3;
-      
-      const [eventsResponse, analysisResponse] = await Promise.all([
-        api.getCalendarEvents(start.toISOString(), end.toISOString()),
-        api.analyzeCalendar(date.toISOString().split('T')[0], daysToAnalyze)
-      ]);
+      // Get events first
+      const eventsResponse = await api.getCalendarEvents(start.toISOString(), end.toISOString());
 
       // Transform actual events
       const actualEvents = (eventsResponse.events || []).map(event => ({
@@ -50,22 +49,48 @@ export const CalendarView = () => {
         type: 'actual'
       }));
 
-      // Transform suggestions into ghost events (show in day and week views)
-      const suggestionEvents = (view === 'day' || view === 'week')
-        ? (analysisResponse.suggestions || []).map(suggestion => ({
-            start: new Date(suggestion.start.dateTime),
-            end: new Date(suggestion.end.dateTime),
-            title: suggestion.title,
-            type: 'suggestion',
-            suggestion: suggestion
-          }))
-        : [];
+      let suggestionEvents = [];
+      let allSuggestions = [];
 
-      console.log(`Loaded ${actualEvents.length} actual events and ${suggestionEvents.length} suggestions`);
+      // Only get suggestions for day and week views
+      if (view === 'day' || view === 'week') {
+        // Calculate days to analyze based on view and date range
+        const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+        const daysToAnalyze = Math.min(daysDiff, 7); // Cap at 7 days for performance
+        
+        console.log(`Analyzing ${daysToAnalyze} days from ${start.toDateString()} to ${end.toDateString()}`);
+        
+        try {
+          const analysisResponse = await api.analyzeCalendar(start.toISOString().split('T')[0], daysToAnalyze);
+          console.log('Analysis response:', analysisResponse);
+
+          // Transform suggestions into ghost events
+          suggestionEvents = (analysisResponse.suggestions || [])
+            .filter(suggestion => {
+              // Only show suggestions within the current view's date range
+              const suggestionDate = new Date(suggestion.start.dateTime);
+              return suggestionDate >= start && suggestionDate <= end;
+            })
+            .map(suggestion => ({
+              start: new Date(suggestion.start.dateTime),
+              end: new Date(suggestion.end.dateTime),
+              title: suggestion.title,
+              type: 'suggestion',
+              suggestion: suggestion
+            }));
+
+          allSuggestions = analysisResponse.suggestions || [];
+        } catch (analysisError) {
+          console.error('Failed to analyze calendar:', analysisError);
+          // Continue without suggestions rather than failing completely
+        }
+      }
+
+      console.log(`Loaded ${actualEvents.length} actual events and ${suggestionEvents.length} suggestions for ${view} view`);
 
       // Combine actual events and suggestions
       setEvents([...actualEvents, ...suggestionEvents]);
-      setSuggestions(analysisResponse.suggestions || []);
+      setSuggestions(allSuggestions);
     } catch (error) {
       console.error('Failed to load calendar data:', error);
       setError(true);
@@ -80,21 +105,21 @@ export const CalendarView = () => {
     return { start: start.toDate(), end: end.toDate() };
   };
 
-  const handleSuggestionApprove = async (suggestion) => {
-    try {
-      const api = new ApiService(token);
-      await api.createFocusBlock(suggestion);
-      await loadCalendarData();
-    } catch (error) {
-      console.error('Failed to create focus block:', error);
+  const handleSessionComplete = async () => {
+    // Optionally add completed session to calendar
+    if (activeSession?.suggestion) {
+      try {
+        const api = new ApiService(token);
+        await api.createFocusBlock(activeSession.suggestion);
+        await loadCalendarData();
+      } catch (error) {
+        console.error('Failed to add session to calendar:', error);
+      }
     }
   };
 
-  const handleSuggestionDismiss = (suggestion) => {
-    // Remove suggestion from events
-    setEvents(prev => prev.filter(event => 
-      event.type !== 'suggestion' || event.suggestion !== suggestion
-    ));
+  const handleSessionClose = () => {
+    setActiveSession(null);
   };
 
   const navigateDate = (action) => {
@@ -140,29 +165,43 @@ export const CalendarView = () => {
 
   const handleEventClick = (event) => {
     if (event.type === 'suggestion') {
-      // Show approve/dismiss options for suggestions
-      const confirmed = window.confirm(`Add "${event.title}" to your calendar?`);
-      if (confirmed) {
-        handleSuggestionApprove(event.suggestion);
-      } else {
-        handleSuggestionDismiss(event.suggestion);
-      }
+      // Show confirmation modal for suggestions
+      setSelectedSuggestion(event.suggestion);
     }
   };
 
-  const eventStyleGetter = (event) => {
+  const handleScheduleSuggestion = async (suggestion) => {
+    try {
+      const api = new ApiService(token);
+      await api.createFocusBlock(suggestion);
+      await loadCalendarData(); // Refresh to show the new event
+      setSelectedSuggestion(null);
+    } catch (error) {
+      console.error('Failed to schedule focus block:', error);
+    }
+  };
+
+  const handleCloseSuggestionModal = () => {
+    setSelectedSuggestion(null);
+  };
+
+  const eventPropGetter = (event) => {
     if (event.type === 'suggestion') {
       return {
-        backgroundColor: 'var(--mantine-color-aura-1)',
-        border: '2px dashed var(--mantine-color-aura-2)',
-        opacity: 0.7,
-        color: 'white'
+        style: {
+          backgroundColor: 'var(--mantine-color-aura-1)',
+          border: '2px dashed var(--mantine-color-aura-2)',
+          opacity: 0.7,
+          color: 'white'
+        }
       };
     }
     return {
-      backgroundColor: 'var(--mantine-color-blue-6)',
-      border: '1px solid var(--mantine-color-blue-7)',
-      color: 'white'
+      style: {
+        backgroundColor: 'var(--mantine-color-blue-6)',
+        border: '1px solid var(--mantine-color-blue-7)',
+        color: 'white'
+      }
     };
   };
 
@@ -257,7 +296,7 @@ export const CalendarView = () => {
 
         {suggestions.length > 0 && (view === 'day' || view === 'week') && (
           <Text size="sm" ta="center" c="dimmed" m="md">
-            Dashed events are focus block suggestions ({suggestions.length} found) - click to add to calendar
+            Dashed events are focus block suggestions ({suggestions.length} found) - click to start session
           </Text>
         )}
       </Box>
@@ -276,13 +315,29 @@ export const CalendarView = () => {
             date={date}
             onNavigate={setDate}
             onSelectEvent={handleEventClick}
-            eventPropGetter={eventStyleGetter}
+            eventPropGetter={eventPropGetter}
             formats={customFormats}
             style={{ height: '100%' }}
             components={{}}
           />
         </Paper>
       </ScrollArea>
+
+      {activeSession && (
+        <SessionTimer
+          duration={activeSession.duration}
+          title={activeSession.title}
+          onComplete={handleSessionComplete}
+          onClose={handleSessionClose}
+        />
+      )}
+
+      <SuggestionConfirmModal
+        suggestion={selectedSuggestion}
+        opened={!!selectedSuggestion}
+        onClose={handleCloseSuggestionModal}
+        onSchedule={handleScheduleSuggestion}
+      />
     </Stack>
   );
 };

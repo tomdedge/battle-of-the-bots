@@ -34,10 +34,21 @@ class ApiService {
   }
 
   async analyzeCalendar(date, days = 1) {
-    const response = await fetch(`${this.baseURL}/api/calendar/analyze?date=${date}&days=${days}`, {
+    const url = `${this.baseURL}/api/calendar/analyze?date=${date}&days=${days}`;
+    console.log('Making analyze request to:', url);
+    
+    const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${this.token}` }
     });
-    return response.json();
+    
+    if (!response.ok) {
+      console.error('Analyze calendar failed:', response.status, response.statusText);
+      throw new Error(`Failed to analyze calendar: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Analyze calendar result:', result);
+    return result;
   }
 
   async createFocusBlock(focusBlock) {

@@ -11,12 +11,15 @@ class CalendarService {
   }
 
   suggestFocusBlock(gap, taskContext = '') {
-    const duration = Math.floor(gap.duration);
+    // Cap duration at 120 minutes (2 hours) for reasonable focus sessions
+    const duration = Math.min(Math.floor(gap.duration), 120);
     let title = `Focus Block`;
     
     // Add duration-based context
-    if (duration >= 60) {
+    if (duration >= 90) {
       title = `Deep Focus Session`;
+    } else if (duration >= 60) {
+      title = `Focus Block`;
     } else if (duration >= 45) {
       title = `Focus Block`;
     } else if (duration >= 25) {
@@ -28,9 +31,10 @@ class CalendarService {
     return {
       title: `${title} (${duration} min)`,
       start: { dateTime: gap.start.toISOString() },
-      end: { dateTime: gap.end.toISOString() },
+      end: { dateTime: new Date(gap.start.getTime() + duration * 60 * 1000).toISOString() },
       description: `AI-suggested focus time${taskContext ? `. Context: ${taskContext}` : ''}. Duration: ${duration} minutes.`,
-      colorId: '2'
+      colorId: '2',
+      duration: duration // Explicitly include duration for frontend
     };
   }
 

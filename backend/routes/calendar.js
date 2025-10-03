@@ -43,11 +43,16 @@ router.get('/analyze', async (req, res) => {
       const currentDate = new Date(baseDate);
       currentDate.setDate(baseDate.getDate() + i);
       
+      console.log(`Analyzing ${currentDate.toDateString()}`);
+      
       const gaps = await calendarService.analyzeCalendarGaps(req.user.userId, currentDate);
       const suggestions = gaps.map(gap => ({
         ...calendarService.suggestFocusBlock(gap),
-        date: currentDate.toDateString()
+        date: currentDate.toDateString(),
+        dayOfWeek: currentDate.toLocaleDateString('en-US', { weekday: 'long' })
       }));
+      
+      console.log(`Found ${gaps.length} gaps and ${suggestions.length} suggestions for ${currentDate.toDateString()}`);
       
       allGaps.push(...gaps);
       allSuggestions.push(...suggestions);
@@ -63,9 +68,21 @@ router.get('/analyze', async (req, res) => {
 
 router.post('/focus-block', async (req, res) => {
   try {
-    const event = await calendarService.createEvent(req.user.userId, req.body);
+    // Transform suggestion format to Google Calendar event format
+    const suggestion = req.body;
+    const eventData = {
+      summary: suggestion.title, // Google Calendar uses 'summary' not 'title'
+      description: suggestion.description,
+      start: suggestion.start,
+      end: suggestion.end,
+      colorId: suggestion.colorId
+    };
+    
+    console.log('Creating focus block event:', eventData);
+    const event = await calendarService.createEvent(req.user.userId, eventData);
     res.json(event);
   } catch (error) {
+    console.error('Focus block creation error:', error);
     res.status(500).json({ error: error.message });
   }
 });
