@@ -15,8 +15,8 @@ export const ChatInterface = () => {
     isConnected, 
     sendMessage, 
     onAIResponse, 
-    chatHistory,
-    setChatHistory,
+    messages,
+    setMessages,
     regenerateResponse,
     user,
     ttsPreferences
@@ -41,7 +41,7 @@ export const ChatInterface = () => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight });
     }
-  }, [chatHistory]);
+  }, [messages]);
 
   const handleSendMessage = (message) => {
     sendMessage(message);
@@ -51,57 +51,34 @@ export const ChatInterface = () => {
   const handleDeleteMessage = async (messageId) => {
     try {
       const api = new ApiService(token);
-      await api.deleteChatMessage(messageId);
-      setChatHistory(prev => prev.filter(chat => chat.id !== messageId));
+      await api.deleteMessage(messageId);
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (error) {
       console.error('Failed to delete message:', error);
     }
   };
 
   const handleRegenerateResponse = async (messageId) => {
-    // Find the chat entry for this message
-    const chat = chatHistory.find(c => c.id === messageId);
-    if (chat && chat.message) {
+    // Find the user message for this messageId
+    const userMessage = messages.find(m => m.id === messageId && m.sender === 'user');
+    if (userMessage && userMessage.content) {
       setIsLoading(true);
       
-      // Clear the existing response and mark as pending
-      setChatHistory(prev => prev.map(c => 
-        c.id === messageId 
-          ? { ...c, response: null, pending: true }
-          : c
+      // Mark message as pending
+      setMessages(prev => prev.map(m => 
+        m.id === messageId 
+          ? { ...m, pending: true }
+          : m
       ));
       
       // Send the original message to get a new response
-      regenerateResponse(chat.message);
+      regenerateResponse(userMessage.content);
     }
   };
 
-  // Convert chat history to message format
-  const messages = chatHistory.flatMap(chat => {
-    const msgs = [{
-      id: `user-${chat.id || chat.timestamp}`,
-      messageId: chat.id,
-      message: chat.message,
-      isUser: true,
-      timestamp: chat.timestamp
-    }];
-    
-    if (chat.response && !chat.pending) {
-      msgs.push({
-        id: `ai-${chat.id || chat.timestamp}`,
-        messageId: chat.id,
-        message: chat.response,
-        isUser: false,
-        timestamp: chat.timestamp
-      });
-    }
-    
-    return msgs;
-  });
-
-  // Check if latest message is from AI
+  // Check if latest message is from AI for regeneration
   const latestMessage = messages[messages.length - 1];
-  const canRegenerate = latestMessage && !latestMessage.isUser;
+  const canRegenerate = latestMessage && latestMessage.sender === 'aurora';
 
   return (
     <Stack 
@@ -131,13 +108,17 @@ export const ChatInterface = () => {
             </Stack>
           </Center>
         ) : (
-          messages.map((msg, index) => (
+          messages.map((message) => (
             <MessageBubble 
-              key={msg.id} 
-              {...msg} 
+              key={message.id} 
+              id={message.id}
+              message={message.content}
+              isUser={message.sender === 'user'}
+              timestamp={message.timestamp}
+              pending={message.pending}
               user={user} 
-              onDelete={msg.isUser ? handleDeleteMessage : null}
-              onRegenerate={!msg.isUser && canRegenerate && index === messages.length - 1 ? handleRegenerateResponse : null}
+              onDelete={message.sender === 'user' ? handleDeleteMessage : null}
+              onRegenerate={message.sender === 'aurora' ? handleRegenerateResponse : null}
             />
           ))
         )}

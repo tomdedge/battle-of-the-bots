@@ -16,7 +16,7 @@ export const TasksView = () => {
   const [showForm, setShowForm] = useState(false);
   const [auroraModal, setAuroraModal] = useState({ opened: false, response: '', isLoading: false });
   const { token } = useAuth();
-  const { sendTaskMessage, sendAuroraMessage } = useSocket();
+  const { sendTaskMessage, sendAuroraMessage, injectAuroraMessage } = useSocket();
 
   useEffect(() => {
     if (token) {
@@ -135,27 +135,33 @@ Execute calendar_create_event now with your chosen time slot.`;
 
       // Set up response handler
       const handleResponse = async (responseData) => {
-        const message = typeof responseData === 'string' ? responseData : responseData?.message || 'Task scheduled!';
+        const message = typeof responseData === 'string' ? responseData : responseData?.message?.message || responseData?.message || 'Task scheduled!';
         
         console.log('Task scheduling response received:', message);
+        console.log('Full responseData:', responseData);
         
-        // Check if Aurora created the calendar event
+        // Check if Aurora successfully executed calendar_create_event tool
         let eventWasCreated = false;
         try {
-          const updatedEventsResponse = await api.getCalendarEvents(
-            today.toISOString(), 
-            tomorrow.toISOString()
+          // Check toolResults from server response - could be nested in message object
+          const toolResults = responseData?.message?.toolResults || responseData?.toolResults || [];
+          console.log('Tool execution results:', toolResults);
+          
+          const calendarToolResult = toolResults.find(tool => 
+            tool.tool === 'calendar_create_event' && tool.success === true
           );
           
-          const taskEvent = updatedEventsResponse.events?.find(event => 
-            event.summary === task.title || event.summary?.includes(task.title)
-          );
+          if (calendarToolResult) {
+            console.log('✅ Aurora successfully created calendar event:', calendarToolResult);
+            eventWasCreated = true;
+          } else {
+            console.log('❌ No successful calendar_create_event tool execution found');
+          }
           
-          eventWasCreated = !!taskEvent;
+          console.log('Final eventWasCreated value:', eventWasCreated);
           
           if (eventWasCreated) {
-            console.log('✅ Aurora successfully created calendar event');
-            
+            console.log('🎉 Event was successfully created - updating task and showing success modal');
             // Update task title ourselves
             try {
               await api.updateTask(task.id, { title: `[Scheduled] ${task.title}` }, selectedListId);
@@ -171,7 +177,7 @@ Execute calendar_create_event now with your chosen time slot.`;
               isLoading: false 
             });
           } else {
-            console.log('❌ Aurora did not create calendar event');
+            console.log('❌ Event was NOT created - sending follow-up to main chat');
             
             // Aurora failed - escalate to main chat
             const followUpMessage = `I had trouble scheduling your task "${task.title}". Here are the details:
@@ -185,9 +191,21 @@ ${eventSummary}
 
 Let's work together to find the perfect time for this task. What time would work best for you?`;
 
-            if (sendAuroraMessage) {
-              console.log('Sending Aurora follow-up message to main chat');
-              sendAuroraMessage(followUpMessage);
+            console.log('📤 Attempting to send follow-up message to main chat:', followUpMessage);
+            console.log('📤 injectAuroraMessage function available:', !!injectAuroraMessage);
+            console.log('📤 injectAuroraMessage function type:', typeof injectAuroraMessage);
+            
+            if (injectAuroraMessage) {
+              console.log('✅ Calling injectAuroraMessage with follow-up message');
+              injectAuroraMessage(followUpMessage);
+              console.log('✅ injectAuroraMessage call completed');
+              
+              // Also add a visual confirmation in the modal
+              setTimeout(() => {
+                console.log('✅ Follow-up message should now be visible in main chat');
+              }, 100);
+            } else {
+              console.log('❌ injectAuroraMessage function is NOT available');
             }
             
             // Show failure response with promise to follow up
@@ -197,8 +215,32 @@ Let's work together to find the perfect time for this task. What time would work
               isLoading: false 
             });
           }
-        } catch (verificationError) {
-          console.error('Failed to verify task scheduling:', verificationError);
+          
+          // Only check for follow-up promises when event creation failed
+          if (!eventWasCreated && typeof message === 'string' && (message.includes("I'll follow up") || message.includes("follow up"))) {
+            console.log('🔍 Detected follow-up promise in Aurora\'s message, sending additional follow-up');
+            const followUpMessage = `I had trouble scheduling your task "${task.title}". Here are the details:
+
+Task: ${task.title}
+${task.notes ? `Notes: ${task.notes}` : ''}
+${task.due ? `Due date: ${task.due}` : ''}
+
+Calendar context:
+${eventSummary}
+
+Let's work together to find the perfect time for this task. What time would work best for you?`;
+
+            if (injectAuroraMessage) {
+              console.log('📤 Sending Aurora follow-up message to main chat (detected follow-up promise)');
+              console.log('📤 Follow-up promise message:', followUpMessage);
+              injectAuroraMessage(followUpMessage);
+              console.log('✅ Follow-up promise message sent');
+            } else {
+              console.log('❌ injectAuroraMessage not available for follow-up promise');
+            }
+          }
+        } catch (parseError) {
+          console.error('Failed to parse tool execution results:', parseError);
           setAuroraModal({ 
             opened: true, 
             response: message, 
@@ -276,8 +318,8 @@ ${taskList}
 Let's work together to find good times for these tasks. Would you like me to try scheduling them one by one, or do you have specific time preferences?`;
 
         // Send to main chat as Aurora message
-        if (sendAuroraMessage) {
-          sendAuroraMessage(followUpMessage);
+        if (injectAuroraMessage) {
+          injectAuroraMessage(followUpMessage);
         }
       }
       

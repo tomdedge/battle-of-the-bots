@@ -72,6 +72,18 @@ router.delete('/chat/message/:messageId', authenticateToken, async (req, res) =>
   }
 });
 
+// Delete individual message (new format)
+router.delete('/messages/:messageId', authenticateToken, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    await dbService.deleteMessage(req.user.userId, messageId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete message error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Logout endpoint
 router.post('/logout', (req, res) => {
   if (process.env.NODE_ENV === 'production') {

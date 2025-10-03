@@ -64,6 +64,8 @@ class AIService {
   }
 
   async sendMessage(message, model, userId = null, sessionId = null, skipHistory = false) {
+    const executedTools = []; // Initialize at function start
+    
     if (!model) {
       model = this.getDefaultModel();
       if (!model) {
@@ -272,6 +274,14 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
               result: typeof result === 'object' ? JSON.stringify(result).substring(0, 200) + '...' : result
             });
             
+            // Track successful tool execution
+            executedTools.push({
+              tool: toolName,
+              success: true,
+              callId: toolCall.id,
+              result: result
+            });
+            
             toolResults.push({
               tool_call_id: toolCall.id,
               role: 'tool',
@@ -283,6 +293,14 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
               callId: toolCall.id,
               error: error.message,
               args: JSON.parse(toolCall.function.arguments)
+            });
+            
+            // Track failed tool execution
+            executedTools.push({
+              tool: toolCall.function.name,
+              success: false,
+              callId: toolCall.id,
+              error: error.message
             });
             
             toolResults.push({
@@ -336,14 +354,17 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
       // Save chat message to database if user is authenticated and not skipping history
       if (userId && !skipHistory) {
         try {
-          await dbService.saveChatMessage(userId, message, finalResponse, model, sessionId);
+          await dbService.saveChatMessage(userId, message, finalResponse.message || finalResponse, model, sessionId);
         } catch (dbError) {
           console.error('Failed to save chat message:', dbError);
           // Don't fail the AI response if database save fails
         }
       }
 
-      return finalResponse;
+      return {
+        message: finalResponse,
+        toolResults: executedTools
+      };
     } catch (error) {
       console.error('LiteLLM API error:', error);
       throw new Error('AI service unavailable');

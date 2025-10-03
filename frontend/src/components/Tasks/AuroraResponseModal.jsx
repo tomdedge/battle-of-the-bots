@@ -56,7 +56,7 @@ export function AuroraResponseModal({ opened, onClose, response, isLoading }) {
                   )
                 }}
               >
-                {response || 'Task scheduled successfully!'}
+                {typeof response === 'string' ? response : response?.message || 'Task scheduled successfully!'}
               </ReactMarkdown>
             </Paper>
           </Group>

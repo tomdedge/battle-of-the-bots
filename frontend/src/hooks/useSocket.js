@@ -9,7 +9,7 @@ export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState(null);
-  const [chatHistory, setChatHistory] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [ttsPreferences, setTtsPreferences] = useState({});
 
   useEffect(() => {
@@ -37,37 +37,31 @@ export const useSocket = () => {
         }
       };
 
-      const onChatHistory = (history) => {
-        setChatHistory(history);
+      const onMessages = (messageList) => {
+        setMessages(messageList);
       };
 
-      const onChatHistoryCleared = () => {
-        setChatHistory([]);
+      const onMessagesCleared = () => {
+        setMessages([]);
       };
 
       const onAIResponse = (response) => {
-        // Update the last pending message with the AI response
-        setChatHistory(prev => {
-          const updated = [...prev];
-          const lastIndex = updated.length - 1;
-          if (lastIndex >= 0 && updated[lastIndex].pending) {
-            updated[lastIndex] = {
-              ...updated[lastIndex],
-              response: response.message,
-              pending: false,
-              timestamp: response.timestamp
-            };
-          }
-          return updated;
-        });
+        // Add single aurora message
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          content: response.message,
+          sender: 'aurora',
+          timestamp: response.timestamp,
+          model: response.model || selectedModel
+        }]);
       };
 
       if (socketInstance) {
         socketInstance.on('connect', onConnect);
         socketInstance.on('disconnect', onDisconnect);
         socketInstance.on('models', onModels);
-        socketInstance.on('chat_history', onChatHistory);
-        socketInstance.on('chat_history_cleared', onChatHistoryCleared);
+        socketInstance.on('messages', onMessages);
+        socketInstance.on('messages_cleared', onMessagesCleared);
         socketInstance.on('ai_response', onAIResponse);
       }
 
@@ -76,8 +70,8 @@ export const useSocket = () => {
           socketInstance.off('connect', onConnect);
           socketInstance.off('disconnect', onDisconnect);
           socketInstance.off('models', onModels);
-          socketInstance.off('chat_history', onChatHistory);
-          socketInstance.off('chat_history_cleared', onChatHistoryCleared);
+          socketInstance.off('messages', onMessages);
+          socketInstance.off('messages_cleared', onMessagesCleared);
           socketInstance.off('ai_response', onAIResponse);
         }
         disconnectSocket();
@@ -85,7 +79,7 @@ export const useSocket = () => {
     } else {
       // Clear state when not authenticated
       setIsConnected(false);
-      setChatHistory([]);
+      setMessages([]);
       setModels([]);
     }
   }, [isAuthenticated, token]);
@@ -102,11 +96,11 @@ export const useSocket = () => {
     if (isAuthenticated && socket && socket.connected) {
       socket.emit('chat_message', { message, model: selectedModel });
       
-      // Optimistically add user message to history
-      setChatHistory(prev => [...prev, {
-        message,
-        response: null, // Will be filled when AI responds
-        model: selectedModel,
+      // Add user message immediately
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        content: message,
+        sender: 'user',
         timestamp: new Date().toISOString(),
         pending: true
       }]);
@@ -143,6 +137,15 @@ export const useSocket = () => {
     }
   };
 
+  const injectAuroraMessage = (message) => {
+    if (isAuthenticated && socket && socket.connected) {
+      console.log('📤 Injecting Aurora message via socket:', message.substring(0, 100) + '...');
+      socket.emit('inject_aurora_message', { message });
+    } else {
+      console.log('❌ Cannot inject Aurora message - not connected or authenticated');
+    }
+  };
+
   const onAIResponse = (callback) => {
     if (socket) {
       socket.on('ai_response', callback);
@@ -157,7 +160,7 @@ export const useSocket = () => {
 
   const clearChatHistory = () => {
     if (socket && socket.connected) {
-      socket.emit('clear_chat_history');
+      socket.emit('clear_messages');
     }
   };
 
@@ -189,12 +192,13 @@ export const useSocket = () => {
     sendMessage, 
     sendTaskMessage,
     sendAuroraMessage,
+    injectAuroraMessage,
     onAIResponse, 
     models, 
     selectedModel, 
     setSelectedModel: handleModelChange,
-    chatHistory,
-    setChatHistory,
+    messages,
+    setMessages,
     clearChatHistory,
     regenerateResponse,
     user,

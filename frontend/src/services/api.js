@@ -26,6 +26,17 @@ class ApiService {
     return response.json();
   }
 
+  async deleteMessage(messageId) {
+    const response = await fetch(`${this.baseURL}/auth/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.json();
+  }
+
   async getCalendarEvents(start, end) {
     const response = await fetch(`${this.baseURL}/api/calendar/events?start=${start}&end=${end}`, {
       headers: { 'Authorization': `Bearer ${this.token}` }

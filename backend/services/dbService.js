@@ -77,6 +77,77 @@ class DatabaseService {
     await this.pool.query(query, [userId, messageId]);
   }
 
+  // NEW MESSAGES TABLE METHODS
+  async saveMessage(userId, content, sender, model = null, sessionId = null, conversationId = null) {
+    const query = `
+      INSERT INTO messages (user_id, content, sender, model, session_id, conversation_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `;
+    const values = [userId, content, sender, model, sessionId, conversationId];
+    const result = await this.pool.query(query, values);
+    return result.rows[0];
+  }
+
+  async getMessages(userId, limit = 50, offset = 0) {
+    const query = `
+      SELECT id, content, sender, model, timestamp, session_id, conversation_id, reply_to_id
+      FROM messages 
+      WHERE user_id = $1 
+      ORDER BY timestamp DESC 
+      LIMIT $2 OFFSET $3
+    `;
+    const result = await this.pool.query(query, [userId, limit, offset]);
+    return result.rows.reverse(); // Return chronological order
+  }
+
+  async deleteMessage(userId, messageId) {
+    const query = 'DELETE FROM messages WHERE user_id = $1 AND id = $2';
+    await this.pool.query(query, [userId, messageId]);
+  }
+
+  async clearMessages(userId) {
+    const query = 'DELETE FROM messages WHERE user_id = $1';
+    await this.pool.query(query, [userId]);
+  }
+
+  // Conversion helper for backward compatibility
+  convertMessagesToChatHistory(messages) {
+    const chatHistory = [];
+    let currentChat = null;
+    
+    for (const msg of messages) {
+      if (msg.sender === 'user') {
+        // Start new chat entry
+        currentChat = {
+          id: msg.id,
+          message: msg.content,
+          response: null,
+          model: null,
+          timestamp: msg.timestamp,
+          session_id: msg.session_id
+        };
+        chatHistory.push(currentChat);
+      } else if (msg.sender === 'aurora' && currentChat) {
+        // Add response to current chat
+        currentChat.response = msg.content;
+        currentChat.model = msg.model;
+      } else if (msg.sender === 'aurora' && !currentChat) {
+        // Standalone Aurora message (inject_aurora_message case)
+        chatHistory.push({
+          id: msg.id,
+          message: '', // Empty user message
+          response: msg.content,
+          model: msg.model,
+          timestamp: msg.timestamp,
+          session_id: msg.session_id
+        });
+      }
+    }
+    
+    return chatHistory;
+  }
+
   async getUserPreferences(userId) {
     const query = 'SELECT * FROM user_preferences WHERE user_id = $1';
     const result = await this.pool.query(query, [userId]);

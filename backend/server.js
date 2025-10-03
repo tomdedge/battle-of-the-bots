@@ -201,12 +201,12 @@ io.on('connection', async (socket) => {
   // Generate session ID for this socket connection
   const sessionId = `session_${socket.id}_${Date.now()}`;
 
-  // Send chat history on connection
+  // Send messages on connection
   try {
-    const chatHistory = await dbService.getChatHistory(socket.user.userId, 20);
-    socket.emit('chat_history', chatHistory);
+    const messages = await dbService.getMessages(socket.user.userId, 50);
+    socket.emit('messages', messages);
   } catch (error) {
-    console.error('Failed to load chat history:', error);
+    console.error('Failed to load messages:', error);
   }
 
   // Load user preferences and send models
@@ -268,12 +268,19 @@ io.on('connection', async (socket) => {
       const { message, model } = data;
       const userId = socket.user.userId;
       
+      // Save user message
+      await dbService.saveMessage(userId, message, 'user', model, sessionId);
+      
       // Send to LiteLLM with user context and session ID
       const aiResponse = await aiService.sendMessage(message, model, userId, sessionId);
       
+      // Save aurora message
+      await dbService.saveMessage(userId, aiResponse.message, 'aurora', model, sessionId);
+      
       // Send response back to client
       socket.emit('ai_response', {
-        message: aiResponse,
+        message: aiResponse.message,
+        toolResults: aiResponse.toolResults,
         timestamp: new Date().toISOString(),
         userId,
         sessionId
@@ -316,6 +323,35 @@ io.on('connection', async (socket) => {
         userId: socket.user.userId,
         sessionId
       });
+    }
+  });
+
+  socket.on('inject_aurora_message', async (data) => {
+    try {
+      const { message } = data;
+      const userId = socket.user.userId;
+      
+      // Save to NEW messages table
+      const savedMessage = await dbService.saveMessage(
+        userId, 
+        message, 
+        'aurora', 
+        'aurora-inject', 
+        sessionId
+      );
+      
+      // Emit to all connected clients for this user
+      io.to(`user_${userId}`).emit('ai_response', {
+        message: message,
+        timestamp: savedMessage.timestamp,
+        userId,
+        sessionId
+      });
+      
+      console.log(`📤 Injected Aurora message (NEW TABLE) for user ${userId}:`, message.substring(0, 100) + '...');
+    } catch (error) {
+      console.error('Inject Aurora message error:', error);
+      socket.emit('error', { message: 'Failed to inject Aurora message' });
     }
   });
 
@@ -370,14 +406,14 @@ io.on('connection', async (socket) => {
     }
   });
 
-  // Handle chat clearing
-  socket.on('clear_chat_history', async () => {
+  // Handle message clearing
+  socket.on('clear_messages', async () => {
     try {
-      await dbService.clearChatHistory(socket.user.userId);
-      socket.emit('chat_history_cleared');
+      await dbService.clearMessages(socket.user.userId);
+      socket.emit('messages_cleared');
     } catch (error) {
-      console.error('Failed to clear chat history:', error);
-      socket.emit('error', { message: 'Failed to clear chat history' });
+      console.error('Failed to clear messages:', error);
+      socket.emit('error', { message: 'Failed to clear messages' });
     }
   });
 
