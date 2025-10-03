@@ -28,6 +28,16 @@ export const TTSSettings = () => {
       {preferences?.tts_enabled && (
         <>
           <Select
+            label="TTS Provider"
+            data={[
+              { value: 'web', label: 'Browser (Web Speech API)' },
+              { value: 'server', label: 'Server (Enhanced Quality)' }
+            ]}
+            value={preferences?.tts_provider || 'web'}
+            onChange={(value) => updatePreferences({ tts_provider: value })}
+          />
+
+          <Select
             label="Voice"
             data={voiceOptions}
             value={preferences?.tts_voice || 'default'}

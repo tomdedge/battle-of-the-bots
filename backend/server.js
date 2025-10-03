@@ -52,6 +52,7 @@ const authRoutes = require('./routes/auth');
 const calendarRoutes = require('./routes/calendar');
 const tasksRoutes = require('./routes/tasks');
 const toolsRoutes = require('./routes/tools');
+const ttsRoutes = require('./routes/tts');
 
 const app = express();
 const server = http.createServer(app);
@@ -70,6 +71,7 @@ app.use('/auth', authRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/tools', toolsRoutes);
+app.use('/api/tts', ttsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -191,6 +193,31 @@ io.on('connection', async (socket) => {
       await dbService.updateUserPreferences(socket.user.userId, data);
     } catch (error) {
       console.error('Failed to update TTS preference:', error);
+    }
+  });
+
+  // Handle TTS generation requests
+  socket.on('tts_request', async (data) => {
+    try {
+      const { text, voice } = data;
+      const ttsService = require('./services/ttsService');
+      
+      // Generate speech using Edge-TTS
+      const audioBuffer = await ttsService.generateSpeech(text, voice);
+      
+      // Send audio back to client
+      socket.emit('tts_response', { 
+        audio: audioBuffer.toString('base64'),
+        success: true 
+      });
+    } catch (error) {
+      console.error('TTS generation failed:', error);
+      // Send fallback signal to client
+      socket.emit('tts_response', { 
+        success: false, 
+        fallback: true,
+        error: 'Server TTS unavailable, using browser TTS' 
+      });
     }
   });
 
