@@ -12,8 +12,8 @@ export function BoxBreathingCanvas({ onBack }) {
   const { colorScheme } = useMantineColorScheme();
 
   const boxSize = 240;
-  const centerX = 175;
-  const centerY = 175;
+  const centerX = 155;
+  const centerY = 155;
 
   const getCircleRadius = () => {
     const baseRadius = 80;
@@ -210,34 +210,37 @@ export function BoxBreathingCanvas({ onBack }) {
         }}
         onClick={toggleBreathing}
       >
-        <Stack align="center" justify="center" gap="xl" style={{ height: '100%' }}>
+        <Stack gap={0} style={{ height: '100%' }}>
           {onBack && (
-            <Group justify="flex-start" style={{ width: '100%', position: 'absolute', top: 20, left: 20, zIndex: 10 }}>
+            <Group justify="center" style={{ minHeight: '30px', padding: '5px', marginTop: '30px', marginBottom: '-20px', position: 'relative' }}>
               <ActionIcon
                 onClick={onBack}
                 variant="subtle"
                 size="lg"
-                style={{ backgroundColor: 'rgba(0,0,0,0.3)', color: 'white' }}
+                style={{ position: 'absolute', left: 'calc(50% - 375px)' }}
               >
                 <IconArrowLeft size={20} />
               </ActionIcon>
+              <Title order={2} c="aura.1">Box Breathing</Title>
             </Group>
           )}
+          
+          <Stack align="center" justify="center" gap={0} style={{ flex: 1 }}>
           <div 
             style={{ 
               position: 'relative',
               cursor: 'pointer',
               width: '100%',
-              maxWidth: '600px',
+              maxWidth: '400px',
+              marginTop: '-20px'
             }}
           >
             <canvas
               ref={canvasRef}
-              width={350}
-              height={350}
+              width={310}
+              height={310}
               style={{
-                borderRadius: '50%',
-                background: 'transparent',
+                background: 'var(--mantine-color-body)',
                 width: '100%',
                 height: '100%'
               }}
@@ -272,6 +275,7 @@ export function BoxBreathingCanvas({ onBack }) {
           <Text size="sm" c="dimmed" ta="center" maw={400}>
             {isActive ? 'Tap to pause' : 'Tap the circle to start breathing'}
           </Text>
+          </Stack>
         </Stack>
       </div>
     </Stack>

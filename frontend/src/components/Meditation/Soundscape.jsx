@@ -70,7 +70,7 @@ export function Soundscape({ onBack }) {
   return (
     <Container size="md" py="xl">
       <Stack gap="xl">
-        <Group justify="space-between">
+        <Group justify="space-between" style={{ minHeight: '30px', padding: '5px' }}>
           <ActionIcon
             onClick={onBack}
             variant="subtle"
