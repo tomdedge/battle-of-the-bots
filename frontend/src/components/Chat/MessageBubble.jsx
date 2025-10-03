@@ -26,23 +26,33 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
           gap: '8px',
           alignItems: 'flex-start',
           flexDirection: isUser ? 'row-reverse' : 'row',
-          maxWidth: '80%'
+          maxWidth: '100%',
+          padding: '0 8px',
         }}
       >
         {isUser && (
           <Avatar 
             src={user?.picture}
-            size="sm" 
+            size="md" 
             color="aura"
           >
             {getUserInitials(user?.name)}
           </Avatar>
         )}
         
+        {!isUser && (
+          <Avatar 
+            src="/aurora.jpg"
+            size="md" 
+            color="aura"
+          >
+            A
+          </Avatar>
+        )}
+        
         <Paper
           style={{
-            minWidth: '80%',
-            maxWidth: '80%',
+            flex: 1,
             backgroundColor: isUser 
               ? 'var(--mantine-color-aura-1)' 
               : error 
@@ -50,8 +60,7 @@ export const MessageBubble = ({ message, isUser, timestamp, error, user, message
                 : 'var(--mantine-color-gray-1)',
             color: isUser ? 'white' : 'var(--mantine-color-text)',
             position: 'relative',
-            padding: messageId && (onDelete || onRegenerate) ? '12px 32px 12px 12px' : !isUser && isSupported && preferences?.tts_enabled ? '12px 32px 12px 12px' : '12px',
-            minWidth: '120px'
+            padding: isUser ? '12px 16px 12px 12px' : '12px 12px 12px 16px',
           }}
         >
           <ReactMarkdown>{message}</ReactMarkdown>

@@ -110,7 +110,6 @@ export const ChatInterface = () => {
       <ScrollArea 
         h={0}
         style={{ flex: 1 }} 
-        px="md" 
         pt="md" 
         ref={scrollAreaRef}
         viewportProps={{

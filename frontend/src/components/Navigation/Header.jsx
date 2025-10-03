@@ -42,6 +42,11 @@ export function Header() {
           >
             <IconMenu2 size={18} />
           </ActionIcon>
+          <img 
+            src="/icon.jpg" 
+            alt="AuraFlow" 
+            style={{ width: 32, height: 32, borderRadius: '50%' }}
+          />
           <Title order={3} c="aura.1">AuraFlow</Title>
         </Group>
         

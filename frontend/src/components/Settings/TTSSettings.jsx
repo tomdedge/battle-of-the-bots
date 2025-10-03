@@ -12,10 +12,23 @@ export const TTSSettings = () => {
     );
   }
 
-  const voiceOptions = voices.map(voice => ({
-    value: voice.name,
-    label: `${voice.name} (${voice.lang})`
-  }));
+  const voiceOptions = voices
+    .filter(voice => 
+      voice.lang.startsWith('en-US') && 
+      (voice.name.toLowerCase().includes('female') || 
+       voice.name === 'Samantha' || 
+       voice.name === 'Alice' || 
+       voice.name === 'Allison' ||
+       voice.name === 'Ava' ||
+       voice.name === 'Susan')
+    )
+    .map(voice => ({
+      value: voice.name,
+      label: `${voice.name} (${voice.lang})`
+    }));
+
+  // Set default to Samantha if available
+  const defaultVoice = voiceOptions.find(v => v.value === 'Samantha')?.value || voiceOptions[0]?.value || 'default';
 
   return (
     <Stack gap="md">
@@ -40,7 +53,7 @@ export const TTSSettings = () => {
           <Select
             label="Voice"
             data={voiceOptions}
-            value={preferences?.tts_voice || 'default'}
+            value={preferences?.tts_voice || defaultVoice}
             onChange={(value) => updatePreferences({ tts_voice: value })}
           />
 
