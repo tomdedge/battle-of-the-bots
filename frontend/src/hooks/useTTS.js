@@ -25,10 +25,10 @@ export const useTTS = (preferences = {}) => {
   const selectedVoice = useMemo(() => {
     console.log('useTTS: Computing selectedVoice', { 
       tts_voice: preferences?.tts_voice, 
-      voicesCount: voices.length,
-      voices: voices.map(v => v.name)
+      voicesCount: voices?.length || 0,
+      voices: voices?.map(v => v.name) || []
     });
-    if (preferences?.tts_voice && preferences.tts_voice !== 'default' && voices.length > 0) {
+    if (preferences?.tts_voice && preferences.tts_voice !== 'default' && voices && voices.length > 0) {
       const found = voices.find(voice => voice.name === preferences.tts_voice);
       console.log('useTTS: Selected voice:', found?.name);
       return found;

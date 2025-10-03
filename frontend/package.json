@@ -6,6 +6,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:coverage": "react-scripts test --coverage --watchAll=false --collectCoverageFrom='src/**/*.{js,jsx}' --collectCoverageFrom='!src/**/*.test.{js,jsx}' --collectCoverageFrom='!src/**/__tests__/**'",
     "test:e2e": "playwright test --reporter=line",
     "test:e2e:ui": "playwright test --ui",
     "eject": "react-scripts eject"

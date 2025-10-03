@@ -18,6 +18,9 @@ jest.mock('@mantine/core', () => ({
     <button data-testid="button" onClick={onClick} {...props}>{children}</button>
   ),
   Text: ({ children, ...props }) => <span data-testid="text" {...props}>{children}</span>,
+  Modal: ({ children, opened }) => opened ? <div data-testid="modal">{children}</div> : null,
+  Divider: ({ label, ...props }) => <div data-testid="divider" {...props}>{label}</div>,
+  Avatar: ({ children, ...props }) => <div data-testid="avatar" {...props}>{children}</div>,
   useMantineColorScheme: () => ({
     colorScheme: 'light',
     toggleColorScheme: mockToggleColorScheme,
@@ -35,6 +38,8 @@ jest.mock('@tabler/icons-react', () => ({
   IconMoon: () => <span data-testid="moon-icon">Moon</span>,
   IconMenu2: () => <span data-testid="menu-icon">☰</span>,
   IconLogout: () => <span data-testid="logout-icon">🚪</span>,
+  IconTrash: () => <span data-testid="trash-icon">🗑️</span>,
+  IconMicrophone: () => <span data-testid="microphone-icon">🎤</span>,
 }));
 
 // Mock AuthContext
@@ -42,7 +47,30 @@ jest.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { name: 'Test User', email: 'test@example.com' },
     logout: jest.fn(),
+    token: 'mock-token',
   }),
+}));
+
+// Mock useSocket hook
+jest.mock('../../../hooks/useSocket', () => ({
+  useSocket: () => ({
+    setChatHistory: jest.fn(),
+    clearChatHistory: jest.fn(),
+    ttsPreferences: {},
+    updateTTSPreferences: jest.fn(),
+  }),
+}));
+
+// Mock TTSSettings component
+jest.mock('../../../components/Settings/TTSSettings', () => ({
+  TTSSettings: () => <div data-testid="tts-settings">TTS Settings</div>,
+}));
+
+// Mock ApiService
+jest.mock('../../../services/api', () => ({
+  default: {
+    clearChatHistory: jest.fn(),
+  },
 }));
 
 describe('Header Component', () => {
