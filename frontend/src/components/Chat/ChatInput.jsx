@@ -44,7 +44,7 @@ export const ChatInput = ({ onSendMessage, disabled }) => {
       <Group gap="xs">
         <TextInput
           flex={1}
-          placeholder={isListening ? "Listening..." : "Ask AuraFlow anything..."}
+          placeholder={isListening ? "Listening..." : "Ask Aurora anything..."}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={disabled}

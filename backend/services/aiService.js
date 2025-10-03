@@ -80,7 +80,7 @@ class AIService {
 
     try {
       // Get user context for personalized system prompt
-      let systemContent = 'You are AuraFlow, a mindful productivity assistant. Keep responses concise and helpful.';
+      let systemContent = 'You are Aurora, a mindful productivity assistant. Keep responses concise and helpful.';
       
       if (userId) {
         console.log('Looking up user with ID:', userId);
