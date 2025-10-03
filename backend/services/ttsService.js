@@ -7,6 +7,7 @@ class TTSService {
   constructor() {
     this.tempDir = path.join(__dirname, '../temp');
     this.ensureTempDir();
+    this.edgeTTSAvailable = null; // Cache availability check
   }
 
   async ensureTempDir() {
@@ -17,38 +18,71 @@ class TTSService {
     }
   }
 
-  async generateSpeech(text, voice = 'default') {
-    const platform = os.platform();
-    
-    try {
-      if (platform === 'darwin') {
-        // macOS - use built-in 'say' command
-        return await this.generateSpeechMacOS(text, voice);
-      } else if (platform === 'linux') {
-        // Linux - try espeak if available
-        return await this.generateSpeechLinux(text, voice);
-      } else {
-        // Windows or other - return null to fallback to client
-        throw new Error('Server TTS not supported on this platform');
-      }
-    } catch (error) {
-      console.log('Server TTS failed, client will use Web Speech API fallback');
-      throw error;
+  async checkEdgeTTSAvailability() {
+    if (this.edgeTTSAvailable !== null) {
+      return this.edgeTTSAvailable;
     }
+
+    return new Promise((resolve) => {
+      const edgeTTS = spawn('edge-tts', ['--help']);
+      
+      edgeTTS.on('close', (code) => {
+        this.edgeTTSAvailable = code === 0;
+        console.log(`edge-tts availability: ${this.edgeTTSAvailable}`);
+        resolve(this.edgeTTSAvailable);
+      });
+
+      edgeTTS.on('error', () => {
+        this.edgeTTSAvailable = false;
+        console.log('edge-tts not available, will use fallback');
+        resolve(false);
+      });
+    });
   }
 
-  async generateSpeechMacOS(text, voice) {
-    const outputFile = path.join(this.tempDir, `tts_${Date.now()}.aiff`);
+  async generateSpeech(text, voice = 'en-US-AriaNeural') {
+    console.log('🎤 TTS generateSpeech called with voice:', voice);
+    
+    // Check if edge-tts is available
+    const edgeAvailable = await this.checkEdgeTTSAvailability();
+    console.log('🎤 Edge-TTS available:', edgeAvailable);
+    
+    if (edgeAvailable) {
+      try {
+        console.log('🎤 Attempting Edge-TTS generation...');
+        return await this.generateSpeechEdgeTTS(text, voice);
+      } catch (error) {
+        console.log('🎤 Edge-TTS failed, trying system TTS:', error.message);
+      }
+    }
+
+    // Fallback to system TTS
+    const platform = os.platform();
+    console.log('🎤 Trying system TTS on platform:', platform);
+    if (platform === 'darwin') {
+      return await this.generateSpeechMacOS(text, voice);
+    }
+    
+    // If no TTS available, throw error to trigger client fallback
+    throw new Error('No server TTS available');
+  }
+
+  async generateSpeechEdgeTTS(text, voice) {
+    const outputFile = path.join(this.tempDir, `tts_${Date.now()}.mp3`);
     
     return new Promise((resolve, reject) => {
-      // Use macOS 'say' command with audio output
-      const sayProcess = spawn('say', [
-        '-v', this.mapVoiceToMacOS(voice),
-        '-o', outputFile,
-        text
+      const edgeTTS = spawn('edge-tts', [
+        '--voice', voice,
+        '--text', text,
+        '--write-media', outputFile
       ]);
 
-      sayProcess.on('close', async (code) => {
+      let stderr = '';
+      edgeTTS.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      edgeTTS.on('close', async (code) => {
         if (code === 0) {
           try {
             const audioBuffer = await fs.readFile(outputFile);
@@ -59,7 +93,37 @@ class TTSService {
             reject(error);
           }
         } else {
-          reject(new Error(`say command exited with code ${code}`));
+          reject(new Error(`edge-tts failed with code ${code}: ${stderr}`));
+        }
+      });
+
+      edgeTTS.on('error', (error) => {
+        reject(error);
+      });
+    });
+  }
+
+  async generateSpeechMacOS(text, voice) {
+    const outputFile = path.join(this.tempDir, `tts_${Date.now()}.aiff`);
+    
+    return new Promise((resolve, reject) => {
+      const sayProcess = spawn('say', [
+        '-v', this.mapVoiceToMacOS(voice),
+        '-o', outputFile,
+        text
+      ]);
+
+      sayProcess.on('close', async (code) => {
+        if (code === 0) {
+          try {
+            const audioBuffer = await fs.readFile(outputFile);
+            await fs.unlink(outputFile).catch(() => {});
+            resolve(audioBuffer);
+          } catch (error) {
+            reject(error);
+          }
+        } else {
+          reject(new Error(`say command failed with code ${code}`));
         }
       });
 
@@ -69,33 +133,12 @@ class TTSService {
     });
   }
 
-  async generateSpeechLinux(text, voice) {
-    // Simple espeak implementation - most Linux systems have this
-    return new Promise((resolve, reject) => {
-      const espeak = spawn('espeak', ['-s', '150', text]);
-      
-      espeak.on('close', (code) => {
-        if (code === 0) {
-          // espeak doesn't generate files easily, so we'll just signal success
-          // and let the client handle it with Web Speech API
-          reject(new Error('Linux TTS completed but no audio file generated'));
-        } else {
-          reject(new Error(`espeak exited with code ${code}`));
-        }
-      });
-
-      espeak.on('error', (error) => {
-        reject(error);
-      });
-    });
-  }
-
   mapVoiceToMacOS(voice) {
-    // Map common voice names to macOS voices
     const voiceMap = {
-      'Aaron': 'Aaron',
-      'Alice': 'Alice', 
+      'en-US-AriaNeural': 'Samantha',
+      'en-US-JennyNeural': 'Samantha',
       'Samantha': 'Samantha',
+      'Alice': 'Alice',
       'default': 'Samantha'
     };
     
@@ -103,14 +146,66 @@ class TTSService {
   }
 
   async getAvailableVoices() {
-    const platform = os.platform();
+    const edgeAvailable = await this.checkEdgeTTSAvailability();
     
+    if (edgeAvailable) {
+      return this.getEdgeTTSVoices();
+    }
+    
+    const platform = os.platform();
     if (platform === 'darwin') {
       return this.getMacOSVoices();
-    } else {
-      // Return empty array for other platforms - will use Web Speech API
-      return [];
     }
+    
+    return [];
+  }
+
+  async getEdgeTTSVoices() {
+    return new Promise((resolve, reject) => {
+      const edgeTTS = spawn('edge-tts', ['--list-voices']);
+      let output = '';
+
+      edgeTTS.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      edgeTTS.on('close', (code) => {
+        if (code === 0) {
+          try {
+            const voices = this.parseEdgeTTSVoices(output);
+            resolve(voices);
+          } catch (error) {
+            reject(error);
+          }
+        } else {
+          reject(new Error(`edge-tts list-voices failed with code ${code}`));
+        }
+      });
+
+      edgeTTS.on('error', (error) => {
+        reject(error);
+      });
+    });
+  }
+
+  parseEdgeTTSVoices(output) {
+    const lines = output.split('\n').filter(line => line.trim());
+    const voices = [];
+
+    for (const line of lines) {
+      // Parse edge-tts voice list format
+      const match = line.match(/Name: (.+?), ShortName: (.+?), Gender: (.+?), Locale: (.+)/);
+      if (match) {
+        voices.push({
+          name: match[2], // Use ShortName for compatibility
+          fullName: match[1],
+          gender: match[3],
+          locale: match[4]
+        });
+      }
+    }
+
+    return voices;
   }
 
   async getMacOSVoices() {
@@ -131,7 +226,7 @@ class TTSService {
             reject(error);
           }
         } else {
-          reject(new Error(`say -v ? exited with code ${code}`));
+          reject(new Error(`say -v ? failed with code ${code}`));
         }
       });
 
@@ -146,7 +241,6 @@ class TTSService {
     const voices = [];
 
     for (const line of lines) {
-      // Parse macOS voice list format: "VoiceName    language    # description"
       const match = line.match(/^(\w+)\s+([a-z]{2}_[A-Z]{2})\s+#\s*(.+)/);
       if (match) {
         voices.push({

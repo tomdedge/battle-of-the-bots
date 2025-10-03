@@ -5,8 +5,10 @@ const TTSContext = createContext();
 export const TTSProvider = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [voices, setVoices] = useState([]);
-  const [preferences, setPreferences] = useState({});
+  const [preferences, setPreferences] = useState({ tts_enabled: true }); // Default enabled
   const [socket, setSocket] = useState(null);
+  const [serverTTSInProgress, setServerTTSInProgress] = useState(false);
+  const [currentRequestId, setCurrentRequestId] = useState(null);
   const utteranceRef = useRef(null);
   const audioRef = useRef(null);
 
@@ -14,6 +16,7 @@ export const TTSProvider = ({ children }) => {
     if ('speechSynthesis' in window) {
       const loadVoices = () => {
         const availableVoices = speechSynthesis.getVoices();
+        console.log('🎤 Web Speech API voices loaded:', availableVoices.length);
         setVoices(availableVoices);
       };
 
@@ -22,22 +25,58 @@ export const TTSProvider = ({ children }) => {
     }
   }, []);
 
+  // Periodic sync to catch any missed state changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (audioRef.current) {
+        syncAudioState();
+      }
+    }, 500); // Check every 500ms
+
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
   // Get socket from window (set by useSocket hook)
   useEffect(() => {
-    if (window.auraflowSocket) {
-      setSocket(window.auraflowSocket);
-      
-      // Listen for TTS responses
-      window.auraflowSocket.on('tts_response', (data) => {
-        if (data.success) {
-          playAudioBuffer(data.audio);
-        } else {
-          // Fallback to Web Speech API
-          console.log('Server TTS failed, using Web Speech API fallback');
-          speakWithWebAPI(window.lastTTSText);
-        }
-      });
-    }
+    const checkSocket = () => {
+      if (window.auraflowSocket) {
+        console.log('🎤 Socket found and connected:', window.auraflowSocket.connected);
+        setSocket(window.auraflowSocket);
+        
+        // Listen for TTS responses
+        window.auraflowSocket.on('tts_response', (data) => {
+          console.log('🎤 TTS response received:', { success: data.success, error: data.error, requestId: data.requestId });
+          
+          // For now, just process all successful responses to get audio working
+          if (data.success) {
+            console.log('🎤 Playing server-generated audio');
+            setServerTTSInProgress(false);
+            setCurrentRequestId(null);
+            playAudioBuffer(data.audio);
+          } else {
+            console.log('🎤 Server TTS failed, no fallback available');
+            setServerTTSInProgress(false);
+            setCurrentRequestId(null);
+            setIsPlaying(false); // Reset state on failure
+          }
+        });
+
+        // Handle socket disconnect during TTS
+        window.auraflowSocket.on('disconnect', () => {
+          console.log('🎤 Socket disconnected during TTS');
+          if (serverTTSInProgress) {
+            console.log('🎤 Server TTS interrupted by disconnect');
+            setServerTTSInProgress(false);
+            setIsPlaying(false);
+          }
+        });
+      } else {
+        console.log('🎤 Socket not yet available, retrying...');
+        setTimeout(checkSocket, 1000);
+      }
+    };
+    
+    checkSocket();
   }, []);
 
   const selectedVoice = useMemo(() => {
@@ -47,38 +86,99 @@ export const TTSProvider = ({ children }) => {
     return null;
   }, [voices, preferences?.tts_voice]);
 
+  // Sync React state with actual audio state
+  const syncAudioState = () => {
+    const actuallyPlaying = audioRef.current && !audioRef.current.paused && !audioRef.current.ended && audioRef.current.readyState > 0;
+    console.log('🎤 Syncing audio state:', { 
+      actuallyPlaying: !!actuallyPlaying, // Convert to boolean
+      currentState: isPlaying,
+      hasAudio: !!audioRef.current,
+      paused: audioRef.current?.paused,
+      ended: audioRef.current?.ended,
+      readyState: audioRef.current?.readyState
+    });
+    
+    // Only sync if we're not in a user-initiated state change
+    if (!serverTTSInProgress && actuallyPlaying !== isPlaying) {
+      console.log('🎤 State mismatch detected, updating from', isPlaying, 'to', actuallyPlaying);
+      setIsPlaying(!!actuallyPlaying); // Ensure boolean
+    }
+  };
+
   const playAudioBuffer = (base64Audio) => {
     try {
-      const audioBlob = new Blob([
-        new Uint8Array(atob(base64Audio).split('').map(c => c.charCodeAt(0)))
-      ], { type: 'audio/mpeg' });
+      // Stop any Web Speech API first
+      speechSynthesis.cancel();
       
+      // Convert base64 to blob more safely
+      const binaryString = atob(base64Audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Stop any current audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      
       audioRef.current = new Audio(audioUrl);
       
-      audioRef.current.onplay = () => setIsPlaying(true);
+      // Bind audio events - but be careful about pause events
+      audioRef.current.onplay = () => {
+        console.log('🎤 Audio onplay event');
+        setIsPlaying(true); // Confirm playing state
+      };
+      audioRef.current.onpause = () => {
+        console.log('🎤 Audio onpause event');
+        // Only set to false if audio actually ended or was stopped by user
+        if (audioRef.current && audioRef.current.ended) {
+          setIsPlaying(false);
+        }
+      };
       audioRef.current.onended = () => {
+        console.log('🎤 Audio onended event');
         setIsPlaying(false);
         URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
       };
       audioRef.current.onerror = () => {
+        console.log('Audio playback failed, no fallback available');
         setIsPlaying(false);
         URL.revokeObjectURL(audioUrl);
-        // Fallback to Web Speech API
-        speakWithWebAPI(window.lastTTSText);
+        audioRef.current = null;
       };
+      audioRef.current.onloadstart = () => console.log('🎤 Audio loading...');
+      audioRef.current.oncanplay = () => console.log('🎤 Audio can play');
       
-      audioRef.current.play();
+      audioRef.current.play().catch(error => {
+        console.log('Audio play failed, no fallback available');
+        syncAudioState();
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      });
     } catch (error) {
-      console.error('Failed to play audio buffer:', error);
-      speakWithWebAPI(window.lastTTSText);
+      console.log('Audio buffer processing failed, no fallback available');
+      syncAudioState();
     }
   };
 
   const speakWithWebAPI = (text) => {
     if (!('speechSynthesis' in window)) return;
 
+    // Stop any current speech
     speechSynthesis.cancel();
+    
+    // Stop any audio playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
     const utterance = new SpeechSynthesisUtterance(text);
     utteranceRef.current = utterance;
 
@@ -96,31 +196,69 @@ export const TTSProvider = ({ children }) => {
   };
 
   const speakText = (text) => {
-    window.lastTTSText = text; // Store for fallback
+    console.log('🎤 TTS speakText called with:', { text: text.substring(0, 50) + '...', socketConnected: socket?.connected, serverTTSInProgress });
     
-    // Try server-side TTS first if socket is available
-    if (socket && socket.connected && preferences?.tts_provider === 'server') {
+    // Prevent multiple requests - check if already in progress
+    if (serverTTSInProgress) {
+      console.log('🎤 TTS already in progress, stopping instead');
+      stopSpeaking();
+      return;
+    }
+    
+    // Check if audio is actually playing
+    const actuallyPlaying = audioRef.current && !audioRef.current.paused && !audioRef.current.ended;
+    
+    if (actuallyPlaying) {
+      console.log('🎤 Audio already playing, stopping instead');
+      stopSpeaking();
+      return;
+    }
+    
+    // Immediately set playing state for responsive UI
+    setIsPlaying(true);
+    
+    window.lastTTSText = text; // Store for reference
+    
+    // Only use server-side TTS
+    if (socket && socket.connected) {
+      console.log('🎤 Using server TTS with voice:', preferences?.tts_voice);
+      const requestId = Date.now().toString();
+      setCurrentRequestId(requestId);
+      setServerTTSInProgress(true);
       socket.emit('tts_request', { 
         text, 
-        voice: preferences?.tts_voice || 'en-US-AriaNeural' 
+        voice: preferences?.tts_voice || 'en-US-AriaNeural',
+        requestId
       });
     } else {
-      // Use Web Speech API
-      speakWithWebAPI(text);
+      console.log('🎤 Socket not available, TTS unavailable');
+      setIsPlaying(false); // Reset state if no socket
     }
   };
 
   const stopSpeaking = () => {
-    // Stop Web Speech API
+    console.log('🎤 Stopping all TTS');
+    
+    // Immediately set state for responsive UI
+    setIsPlaying(false);
+    setServerTTSInProgress(false);
+    setCurrentRequestId(null);
+    
+    // Stop Web Speech API (just in case)
     speechSynthesis.cancel();
     
     // Stop audio playback
     if (audioRef.current) {
+      console.log('🎤 Stopping audio playback');
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      // Clean up the audio element
+      const audioUrl = audioRef.current.src;
+      audioRef.current = null;
+      if (audioUrl && audioUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(audioUrl);
+      }
     }
-    
-    setIsPlaying(false);
   };
 
   const updatePreferences = (newPrefs) => {

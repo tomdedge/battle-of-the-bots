@@ -6,6 +6,10 @@ echo "🚀 Setting up AuraFlow..."
 echo "📦 Installing dependencies..."
 npm run install-all
 
+# Install edge-tts for high-quality TTS
+echo "🎤 Installing edge-tts for high-quality text-to-speech..."
+cd backend && npm run install-tts && cd ..
+
 # Create temp directory for TTS
 echo "📁 Creating temp directories..."
 mkdir -p backend/temp
@@ -27,3 +31,9 @@ echo "To start the application:"
 echo "  npm start"
 echo ""
 echo "The app will be available at http://localhost:3000"
+echo ""
+if command -v edge-tts &> /dev/null; then
+    echo "🎤 High-quality TTS (edge-tts) is available"
+else
+    echo "⚠️  edge-tts not available - will use system TTS fallback"
+fi

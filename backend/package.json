@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "migrate": "node migrate.js"
+    "migrate": "node migrate.js",
+    "install-tts": "pip3 install edge-tts || echo 'edge-tts installation failed, TTS will use fallback'"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

@@ -198,25 +198,30 @@ io.on('connection', async (socket) => {
 
   // Handle TTS generation requests
   socket.on('tts_request', async (data) => {
+    console.log('🎤 TTS request received:', { text: data.text?.substring(0, 50) + '...', voice: data.voice, requestId: data.requestId });
     try {
-      const { text, voice } = data;
+      const { text, voice, requestId } = data;
       const ttsService = require('./services/ttsService');
       
+      console.log('🎤 Attempting TTS generation with edge-tts...');
       // Generate speech using Edge-TTS
       const audioBuffer = await ttsService.generateSpeech(text, voice);
       
+      console.log('🎤 TTS generation successful, sending audio buffer of size:', audioBuffer.length);
       // Send audio back to client
       socket.emit('tts_response', { 
         audio: audioBuffer.toString('base64'),
-        success: true 
+        success: true,
+        requestId
       });
     } catch (error) {
-      console.error('TTS generation failed:', error);
+      console.error('🎤 TTS generation failed:', error.message);
       // Send fallback signal to client
       socket.emit('tts_response', { 
         success: false, 
         fallback: true,
-        error: 'Server TTS unavailable, using browser TTS' 
+        error: 'Server TTS unavailable: ' + error.message,
+        requestId: data.requestId
       });
     }
   });

@@ -117,7 +117,7 @@ export const ChatInterface = () => {
         }}
       >
         {messages.length === 0 ? (
-          <Center h="100%">
+          <Center h="100%" p="xs">
             <Stack align="center" gap="xs">
               <Text c="dimmed">Welcome to AuraFlow, {user?.name}!</Text>
               <Text size="sm" c="dimmed">Start a conversation about your productivity and mindfulness</Text>
