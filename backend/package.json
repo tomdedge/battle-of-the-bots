@@ -8,7 +8,8 @@
     "migrate": "node db/migrate.js",
     "migrate-old": "node migrate.js",
     "test-messages": "node test_new_messages.js",
-    "install-tts": "pip3 install edge-tts || echo 'edge-tts installation failed, TTS will use fallback'"
+    "install-tts": "pip3 install -r requirements.txt || echo 'Python dependencies installation failed, TTS will use fallback'",
+    "postinstall": "npm run install-tts"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

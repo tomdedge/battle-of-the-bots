@@ -387,7 +387,7 @@ Let's work together to find good times for these tasks. Would you like me to try
       </Box>
 
       <ScrollArea h={0} style={{ flex: 1 }} pt={0}>
-        <Paper p="md" pos="relative">
+        <Paper p="md" pos="relative" h="100%" style={{ minHeight: '100vh' }}>
           <LoadingOverlay visible={loading} />
           
           <Stack gap="md">
