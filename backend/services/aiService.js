@@ -122,14 +122,17 @@ Available Functions:
 - tasks_get_task_lists: Get task lists
 
 IMPORTANT WORKFLOW RULES:
-1. To DELETE a task: Use tasks_delete_task with taskName parameter (e.g., {"taskName": "Brush teeth"})
-2. To DELETE a calendar event: Use calendar_delete_event with eventName parameter (e.g., {"eventName": "Watch stranger things"})
-3. To UPDATE a task: First call tasks_get_tasks to get the task ID, then use tasks_update_task
-4. To COMPLETE a task: First call tasks_get_tasks to get the task ID, then use tasks_complete_task
-5. To UPDATE a calendar event: First call calendar_get_events to get the event ID, then use calendar_update_event
-6. Never claim you've completed an action unless you actually called the appropriate tool
-7. tasks_get_tasks only RETRIEVES tasks - it does NOT delete, update, or complete them
-8. calendar_get_events only RETRIEVES events - it does NOT delete or update them
+1. BEFORE deleting tasks: ALWAYS call tasks_get_tasks first to see what tasks exist
+2. BEFORE deleting calendar events: ALWAYS call calendar_get_events first to see what events exist
+3. To DELETE a task: Use tasks_delete_task with taskName parameter (e.g., {"taskName": "Brush teeth"})
+4. To DELETE a calendar event: Use calendar_delete_event with eventName parameter (e.g., {"eventName": "Watch stranger things"})
+4. To DELETE a calendar event: Use calendar_delete_event with eventName parameter (e.g., {"eventName": "Watch stranger things"})
+5. To UPDATE a task: First call tasks_get_tasks to get the task ID, then use tasks_update_task
+6. To COMPLETE a task: First call tasks_get_tasks to get the task ID, then use tasks_complete_task
+7. To UPDATE a calendar event: First call calendar_get_events to get the event ID, then use calendar_update_event
+8. Never claim you've completed an action unless you actually called the appropriate tool
+9. tasks_get_tasks only RETRIEVES tasks - it does NOT delete, update, or complete them
+10. calendar_get_events only RETRIEVES events - it does NOT delete or update them
 
 Keep responses concise, helpful, and personalized. Use their name when appropriate.`;
       }
@@ -253,7 +256,28 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         for (const toolCall of aiMessage.tool_calls) {
           try {
             const toolName = toolCall.function.name;
-            const toolArgs = JSON.parse(toolCall.function.arguments);
+            let toolArgs;
+            
+            try {
+              toolArgs = JSON.parse(toolCall.function.arguments);
+            } catch (parseError) {
+              console.error(`❌ TOOL ARGS PARSE ERROR: ${toolName}`, {
+                user: userId,
+                callId: toolCall.id,
+                error: parseError.message,
+                rawArgs: toolCall.function.arguments
+              });
+              
+              toolResults.push({
+                tool_call_id: toolCall.id,
+                role: 'tool',
+                content: JSON.stringify({ 
+                  error: `Invalid tool arguments: ${parseError.message}`,
+                  success: false
+                })
+              });
+              continue;
+            }
             
             // Add userId to tool arguments
             toolArgs.userId = userId;
@@ -292,7 +316,7 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
               user: userId,
               callId: toolCall.id,
               error: error.message,
-              args: JSON.parse(toolCall.function.arguments)
+              stack: error.stack
             });
             
             // Track failed tool execution
@@ -314,39 +338,153 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
           }
         }
 
-        // Get final response with tool results
-        const followUpResponse = await fetch(`${this.baseURL}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Ancestry-IsInternal': 'true',
-            'Ancestry-ClientPath': 'auraflow',
-            'Authorization': `Bearer ${this.apiKey}`
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              ...conversationMessages,
-              aiMessage,
-              ...toolResults
-            ]
-          })
-        });
+        // Get final response with tool results - RECURSIVE TOOL HANDLING
+        let currentMessages = [
+          ...conversationMessages,
+          aiMessage,
+          ...toolResults
+        ];
+        
+        let maxIterations = 5; // Prevent infinite loops
+        let iteration = 0;
+        
+        while (iteration < maxIterations) {
+          const followUpResponse = await fetch(`${this.baseURL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Ancestry-IsInternal': 'true',
+              'Ancestry-ClientPath': 'auraflow',
+              'Authorization': `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+              model,
+              messages: currentMessages,
+              tools: userId && tools.length > 0 ? tools : undefined,
+              tool_choice: userId && tools.length > 0 ? 'auto' : undefined
+            })
+          });
 
-        const followUpData = await followUpResponse.json();
-        
-        if (!followUpResponse.ok) {
-          console.error('Follow-up API error response:', followUpData);
-          throw new Error(`Follow-up API error: ${followUpData.error?.message || followUpResponse.statusText}`);
+          const followUpData = await followUpResponse.json();
+          
+          if (!followUpResponse.ok) {
+            console.error('Follow-up API error response:', followUpData);
+            throw new Error(`Follow-up API error: ${followUpData.error?.message || followUpResponse.statusText}`);
+          }
+          
+          if (!followUpData.choices || !followUpData.choices[0] || !followUpData.choices[0].message) {
+            console.error('Unexpected follow-up API response structure:', followUpData);
+            throw new Error('Invalid follow-up API response structure');
+          }
+          
+          const followUpMessage = followUpData.choices[0].message;
+          
+          // If no more tool calls, we're done
+          if (!followUpMessage.tool_calls || followUpMessage.tool_calls.length === 0) {
+            finalResponse = followUpMessage.content;
+            console.log(`🤖 LLM FINAL RESPONSE (${userId}):`, finalResponse);
+            console.log(`🔍 finalResponse type:`, typeof finalResponse);
+            console.log(`🔍 finalResponse value:`, finalResponse);
+            break;
+          }
+          
+          // Execute more tool calls
+          console.log(`🔄 ITERATION ${iteration + 1}: LLM wants to make ${followUpMessage.tool_calls.length} more tool calls`);
+          
+          const moreToolResults = [];
+          for (const toolCall of followUpMessage.tool_calls) {
+            try {
+              const toolName = toolCall.function.name;
+              let toolArgs;
+              
+              try {
+                toolArgs = JSON.parse(toolCall.function.arguments);
+              } catch (parseError) {
+                console.error(`❌ TOOL ARGS PARSE ERROR: ${toolName}`, {
+                  user: userId,
+                  callId: toolCall.id,
+                  error: parseError.message,
+                  rawArgs: toolCall.function.arguments
+                });
+                
+                moreToolResults.push({
+                  tool_call_id: toolCall.id,
+                  role: 'tool',
+                  content: JSON.stringify({ 
+                    error: `Invalid tool arguments: ${parseError.message}`,
+                    success: false
+                  })
+                });
+                continue;
+              }
+              
+              toolArgs.userId = userId;
+              
+              console.log(`🔧 TOOL CALL: ${toolName}`, {
+                user: userId,
+                args: toolArgs,
+                callId: toolCall.id
+              });
+              
+              const startTime = Date.now();
+              const result = await AuraFlowTools.executeTool(toolName, toolArgs);
+              const duration = Date.now() - startTime;
+              
+              console.log(`✅ TOOL SUCCESS: ${toolName} (${duration}ms)`, {
+                user: userId,
+                callId: toolCall.id,
+                result: typeof result === 'object' ? JSON.stringify(result).substring(0, 200) + '...' : result
+              });
+              
+              executedTools.push({
+                tool: toolName,
+                success: true,
+                callId: toolCall.id,
+                result: result
+              });
+              
+              moreToolResults.push({
+                tool_call_id: toolCall.id,
+                role: 'tool',
+                content: JSON.stringify(result)
+              });
+            } catch (error) {
+              console.error(`❌ TOOL ERROR: ${toolCall.function.name}`, {
+                user: userId,
+                callId: toolCall.id,
+                error: error.message,
+                stack: error.stack
+              });
+              
+              executedTools.push({
+                tool: toolCall.function.name,
+                success: false,
+                callId: toolCall.id,
+                error: error.message
+              });
+              
+              moreToolResults.push({
+                tool_call_id: toolCall.id,
+                role: 'tool',
+                content: JSON.stringify({ 
+                  error: this.formatToolError(error),
+                  success: false
+                })
+              });
+            }
+          }
+          
+          // Add this round of messages to the conversation
+          currentMessages.push(followUpMessage);
+          currentMessages.push(...moreToolResults);
+          
+          iteration++;
         }
         
-        if (!followUpData.choices || !followUpData.choices[0] || !followUpData.choices[0].message) {
-          console.error('Unexpected follow-up API response structure:', followUpData);
-          throw new Error('Invalid follow-up API response structure');
+        if (iteration >= maxIterations) {
+          console.warn(`⚠️  Hit max iterations (${maxIterations}) for tool calls`);
+          finalResponse = "I've completed several steps but reached the maximum number of operations. Please check the results.";
         }
-        
-        finalResponse = followUpData.choices[0].message.content;
-        console.log(`🤖 LLM FINAL RESPONSE (${userId}):`, finalResponse);
       } else {
         console.log(`🤖 LLM RESPONSE (${userId}):`, finalResponse);
       }
@@ -354,17 +492,19 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
       // Save chat message to database if user is authenticated and not skipping history
       if (userId && !skipHistory) {
         try {
-          await dbService.saveChatMessage(userId, message, finalResponse.message || finalResponse, model, sessionId);
+          const messageContent = typeof finalResponse === 'string' 
+            ? finalResponse 
+            : finalResponse?.message || finalResponse?.content || 'No response content';
+          
+          await dbService.saveChatMessage(userId, message, messageContent, model, sessionId);
         } catch (dbError) {
           console.error('Failed to save chat message:', dbError);
           // Don't fail the AI response if database save fails
         }
       }
 
-      return {
-        message: finalResponse,
-        toolResults: executedTools
-      };
+      console.log(`🔍 About to return finalResponse:`, typeof finalResponse, finalResponse);
+      return finalResponse;
     } catch (error) {
       console.error('LiteLLM API error:', error);
       throw new Error('AI service unavailable');

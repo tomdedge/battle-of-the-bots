@@ -27,6 +27,18 @@ export const ChatInterface = () => {
     const cleanup = onAIResponse((response) => {
       setIsLoading(false);
       
+      // Add AI response to messages
+      if (response?.message) {
+        const aiMessage = {
+          id: Date.now(),
+          content: response.message,
+          sender: 'aurora',
+          timestamp: response.timestamp || new Date().toISOString(),
+          toolResults: response.toolResults
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      }
+      
       // Auto-play Aurora's response if enabled
       if (preferences?.tts_autoplay && response?.message) {
         setTimeout(() => speakText(response.message), 500); // Small delay to ensure UI updates
@@ -34,12 +46,20 @@ export const ChatInterface = () => {
     });
 
     return cleanup;
-  }, [onAIResponse, preferences?.tts_autoplay, speakText]);
+  }, [onAIResponse, preferences?.tts_autoplay, speakText, setMessages]);
 
   useEffect(() => {
     // Auto-scroll to bottom when chat history updates
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight });
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTo({ 
+            top: scrollAreaRef.current.scrollHeight, 
+            behavior: 'smooth' 
+          });
+        }
+      }, 100);
     }
   }, [messages]);
 

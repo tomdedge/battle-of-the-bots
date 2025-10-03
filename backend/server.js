@@ -274,17 +274,41 @@ io.on('connection', async (socket) => {
       // Send to LiteLLM with user context and session ID
       const aiResponse = await aiService.sendMessage(message, model, userId, sessionId);
       
-      // Save aurora message
-      await dbService.saveMessage(userId, aiResponse.message, 'aurora', model, sessionId);
+      console.log('🔍 aiResponse type:', typeof aiResponse);
+      console.log('🔍 aiResponse content:', aiResponse);
       
-      // Send response back to client
-      socket.emit('ai_response', {
-        message: aiResponse.message,
-        toolResults: aiResponse.toolResults,
-        timestamp: new Date().toISOString(),
-        userId,
-        sessionId
-      });
+      // Only save aurora message if we have a valid response
+      const responseContent = typeof aiResponse === 'string' ? aiResponse : aiResponse?.message;
+      if (responseContent && responseContent.trim()) {
+        await dbService.saveMessage(userId, responseContent, 'aurora', model, sessionId);
+      } else {
+        console.error('❌ NO VALID RESPONSE CONTENT:', {
+          aiResponseType: typeof aiResponse,
+          aiResponseValue: aiResponse,
+          responseContent: responseContent,
+          hasMessage: !!(aiResponse?.message),
+          messageValue: aiResponse?.message
+        });
+      }
+      
+      // Only send response to client if we have valid content
+      if (responseContent && responseContent.trim()) {
+        console.log('✅ Sending valid response to client:', {
+          messageLength: responseContent.length,
+          hasToolResults: !!(typeof aiResponse === 'object' ? aiResponse.toolResults : false)
+        });
+        
+        // Send response back to client
+        socket.emit('ai_response', {
+          message: responseContent,
+          toolResults: typeof aiResponse === 'object' ? aiResponse.toolResults : undefined,
+          timestamp: new Date().toISOString(),
+          userId,
+          sessionId
+        });
+      } else {
+        console.error('❌ NOT SENDING EMPTY RESPONSE TO CLIENT');
+      }
     } catch (error) {
       console.error('Chat message error:', error);
       socket.emit('ai_response', {

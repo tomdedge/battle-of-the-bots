@@ -62,7 +62,6 @@ export const useSocket = () => {
         socketInstance.on('models', onModels);
         socketInstance.on('messages', onMessages);
         socketInstance.on('messages_cleared', onMessagesCleared);
-        socketInstance.on('ai_response', onAIResponse);
       }
 
       return () => {
@@ -72,7 +71,6 @@ export const useSocket = () => {
           socketInstance.off('models', onModels);
           socketInstance.off('messages', onMessages);
           socketInstance.off('messages_cleared', onMessagesCleared);
-          socketInstance.off('ai_response', onAIResponse);
         }
         disconnectSocket();
       };

@@ -283,21 +283,18 @@ Let's work together to find the perfect time for this task. What time would work
       `- ${task.title}${task.notes ? ` (${task.notes})` : ''}`
     ).join('\n');
     
-    const prompt = `I need you to schedule all of these tasks in my calendar right now:
+    const prompt = `I need you to schedule these tasks in my calendar. Start by getting my calendar events, then create calendar events for each task, then update the task titles.
 
+Tasks to schedule:
 ${taskList}
 
-CRITICAL INSTRUCTIONS - Execute these steps in order and DO NOT respond until ALL steps are complete:
+Step 1: Use calendar_get_events to check my current calendar for today and tomorrow
+Step 2: Use calendar_create_event for "Do dishes after 6pm but before 9pm" - find a 30-minute slot between 6-9pm today
+Step 3: Use calendar_create_event for "6pm Movie tomorrow (Mission Impossible)" - schedule for 6pm tomorrow, 2 hours duration
+Step 4: Use tasks_update_task to add [Scheduled] to the beginning of each task title
 
-1. Use calendar_get_events to check my current calendar
-2. For each task, find appropriate time slots (30 minutes each unless clearly more/less time is needed)
-3. Use calendar_create_event for each task with their exact titles
-4. Use tasks_update_task to add [Scheduled] to the beginning of each task title
-5. ONLY AFTER all tools have executed successfully, respond with a summary: "Successfully scheduled all ${unscheduledTasks.length} tasks: [list with times]"
-
-If ANY step fails, respond with: "I had trouble scheduling some tasks. Let's work on this together in the main chat - I'll send you the details there."
-
-DO NOT respond with any message until you have completed ALL the tool calls for ALL tasks. Execute all the tools first, then respond based on the results.`;
+Execute ALL these steps. If successful, respond: "Successfully scheduled all ${unscheduledTasks.length} tasks!"
+If any step fails, respond: "I had trouble scheduling some tasks. Let's work on this together in the main chat - I'll send you the details there."`;
 
     // Set up one-time listener for AI response
     const handleResponse = (responseData) => {
