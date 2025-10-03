@@ -8,7 +8,8 @@ export const TTSProvider = ({ children }) => {
   const [preferences, setPreferences] = useState({ tts_enabled: true }); // Default enabled
   const [socket, setSocket] = useState(null);
   const [serverTTSInProgress, setServerTTSInProgress] = useState(false);
-  const [currentRequestId, setCurrentRequestId] = useState(null);
+  const [isStopped, setIsStopped] = useState(false); // Flag to prevent playing after stop
+  const currentRequestIdRef = useRef(null);
   const utteranceRef = useRef(null);
   const audioRef = useRef(null);
 
@@ -45,18 +46,36 @@ export const TTSProvider = ({ children }) => {
         
         // Listen for TTS responses
         window.auraflowSocket.on('tts_response', (data) => {
-          console.log('🎤 TTS response received:', { success: data.success, error: data.error, requestId: data.requestId });
+          console.log('🎤 === SOCKET RESPONSE RECEIVED ===');
+          console.log('🎤 TTS response received:', { 
+            success: data.success, 
+            error: data.error, 
+            requestId: data.requestId, 
+            isStopped,
+            hasCurrentRequest: !!currentRequestIdRef.current
+          });
           
-          // For now, just process all successful responses to get audio working
+          // Don't play if user has stopped
+          if (isStopped) {
+            console.log('🎤 Ignoring TTS response - user stopped audio');
+            return;
+          }
+          
+          // Only process if we have a pending request
+          if (!currentRequestIdRef.current) {
+            console.log('🎤 Ignoring TTS response - no pending request');
+            return;
+          }
+          
+          console.log('🎤 Processing TTS response');
+          setServerTTSInProgress(false);
+          currentRequestIdRef.current = null;
+          
           if (data.success) {
             console.log('🎤 Playing server-generated audio');
-            setServerTTSInProgress(false);
-            setCurrentRequestId(null);
             playAudioBuffer(data.audio);
           } else {
             console.log('🎤 Server TTS failed, no fallback available');
-            setServerTTSInProgress(false);
-            setCurrentRequestId(null);
             setIsPlaying(false); // Reset state on failure
           }
         });
@@ -196,7 +215,14 @@ export const TTSProvider = ({ children }) => {
   };
 
   const speakText = (text) => {
-    console.log('🎤 TTS speakText called with:', { text: text.substring(0, 50) + '...', socketConnected: socket?.connected, serverTTSInProgress });
+    console.log('🎤 === TTS BUTTON CLICKED ===');
+    console.log('🎤 TTS speakText called with:', { 
+      text: text.substring(0, 50) + '...', 
+      socketConnected: socket?.connected, 
+      serverTTSInProgress,
+      isPlaying,
+      isStopped
+    });
     
     // Prevent multiple requests - check if already in progress
     if (serverTTSInProgress) {
@@ -215,7 +241,9 @@ export const TTSProvider = ({ children }) => {
     }
     
     // Immediately set playing state for responsive UI
+    console.log('🎤 Setting isPlaying to true and isStopped to false');
     setIsPlaying(true);
+    setIsStopped(false); // Clear stop flag when starting new audio
     
     window.lastTTSText = text; // Store for reference
     
@@ -223,13 +251,16 @@ export const TTSProvider = ({ children }) => {
     if (socket && socket.connected) {
       console.log('🎤 Using server TTS with voice:', preferences?.tts_voice);
       const requestId = Date.now().toString();
-      setCurrentRequestId(requestId);
+      console.log('🎤 Generated requestId:', requestId);
+      currentRequestIdRef.current = requestId;
       setServerTTSInProgress(true);
+      console.log('🎤 EMITTING tts_request to socket');
       socket.emit('tts_request', { 
         text, 
         voice: preferences?.tts_voice || 'en-US-AriaNeural',
         requestId
       });
+      console.log('🎤 Socket emit completed');
     } else {
       console.log('🎤 Socket not available, TTS unavailable');
       setIsPlaying(false); // Reset state if no socket
@@ -237,12 +268,16 @@ export const TTSProvider = ({ children }) => {
   };
 
   const stopSpeaking = () => {
-    console.log('🎤 Stopping all TTS');
+    console.log('🎤 === STOP BUTTON CLICKED ===');
+    console.log('🎤 Stopping all TTS - current state:', { isPlaying, serverTTSInProgress, isStopped });
+    
+    // Set stop flag to prevent any pending audio from playing
+    setIsStopped(true);
     
     // Immediately set state for responsive UI
     setIsPlaying(false);
     setServerTTSInProgress(false);
-    setCurrentRequestId(null);
+    currentRequestIdRef.current = null;
     
     // Stop Web Speech API (just in case)
     speechSynthesis.cancel();
@@ -258,7 +293,11 @@ export const TTSProvider = ({ children }) => {
       if (audioUrl && audioUrl.startsWith('blob:')) {
         URL.revokeObjectURL(audioUrl);
       }
+    } else {
+      console.log('🎤 No audio to stop');
     }
+    
+    console.log('🎤 Stop completed');
   };
 
   const updatePreferences = (newPrefs) => {
