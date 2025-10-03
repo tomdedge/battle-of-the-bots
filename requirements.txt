@@ -1,1 +1,1 @@
-# Empty requirements file for Heroku Python buildpack
+edge-tts>=6.1.3
