@@ -59,7 +59,13 @@ const userRoutes = require('./routes/user');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-  cors: { origin: process.env.FRONTEND_URL || "http://localhost:3000" }
+  cors: { 
+    origin: process.env.NODE_ENV === 'production' 
+      ? ["https://auraflow-75c3a9f1fcd1.herokuapp.com", process.env.FRONTEND_URL].filter(Boolean)
+      : process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true
+  },
+  allowEIO3: true
 });
 
 // Middleware

@@ -9,12 +9,17 @@ export const connectSocket = (token) => {
     socket.disconnect();
   }
   
-  socket = io(SOCKET_URL, {
-    auth: {
-      token: token
-    },
-    autoConnect: true
-  });
+  const socketConfig = {
+    autoConnect: true,
+    withCredentials: true, // Include cookies
+  };
+  
+  // In development, use token auth. In production, rely on httpOnly cookies
+  if (process.env.NODE_ENV !== 'production' && token) {
+    socketConfig.auth = { token: token };
+  }
+  
+  socket = io(SOCKET_URL, socketConfig);
   
   // Expose socket globally for TTS context
   window.auraflowSocket = socket;
