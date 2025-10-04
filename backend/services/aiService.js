@@ -49,12 +49,15 @@ class AIService {
     
     this.cachedModels = result;
     
+    console.log('Available models from API:', result.data?.map(m => m.id) || 'No models');
+    
     // Cache a suitable chat model as default - prefer llama-3.1-8b-instant for tool support
     if (result.data && result.data.length > 0) {
       // First try to find llama-3.1-8b-instant specifically (supports tools)
       const preferredModel = result.data.find(model => model.id === 'llama-3.1-8b-instant');
       if (preferredModel) {
         this.defaultModel = preferredModel.id;
+        console.log('✅ Selected preferred model for tool support:', this.defaultModel);
       } else {
         // Fallback to other llama models that support tools
         const chatModel = result.data.find(model => 
@@ -63,6 +66,8 @@ class AIService {
           model.id.includes('gemma')
         );
         this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
+        console.log('⚠️  Fallback model selected:', this.defaultModel, '(may not support tools)');
+      }
       }
     }
     
@@ -261,6 +266,13 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
       
       if (!response.ok) {
         console.error('API error response:', data);
+        
+        // If tool calling is not supported, retry without tools
+        if (data.error?.message?.includes('tool calling') && tools && tools.length > 0) {
+          console.log('🔄 Tool calling not supported, retrying without tools...');
+          return this.sendMessage(conversationMessages, null, userId, sessionId);
+        }
+        
         throw new Error(`API error: ${data.error?.message || response.statusText}`);
       }
       
