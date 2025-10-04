@@ -3,7 +3,12 @@ const dbService = require('../services/dbService');
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  let token = authHeader && authHeader.split(' ')[1];
+  
+  // If no token in header, check for httpOnly cookie (production)
+  if (!token && req.cookies && req.cookies.authToken) {
+    token = req.cookies.authToken;
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
