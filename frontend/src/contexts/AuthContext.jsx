@@ -69,12 +69,16 @@ export const AuthProvider = ({ children }) => {
       } else {
         // Check if authenticated via httpOnly cookie (production)
         try {
-          const response = await fetch('/auth/status', {
+          const response = await fetch('/auth/status?includeToken=true', {
             credentials: 'include' // Include cookies
           });
           if (response.ok) {
             const data = await response.json();
             setUser(data.user);
+            // Set token for socket connections
+            if (data.token) {
+              setToken(data.token);
+            }
           }
         } catch (error) {
           console.log('Not authenticated via cookie');

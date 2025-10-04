@@ -53,7 +53,7 @@ router.get('/chat/history', authenticateToken, async (req, res) => {
 
 // Check authentication status (for httpOnly cookies)
 router.get('/status', authenticateToken, (req, res) => {
-  res.json({ 
+  const response = { 
     authenticated: true, 
     user: {
       id: req.user.userId,
@@ -61,7 +61,14 @@ router.get('/status', authenticateToken, (req, res) => {
       name: req.user.name,
       picture: req.user.picture
     }
-  });
+  };
+  
+  // Provide token for socket connections when requested
+  if (req.query.includeToken === 'true') {
+    response.token = req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
+  }
+  
+  res.json(response);
 });
 
 // Clear all chat history
