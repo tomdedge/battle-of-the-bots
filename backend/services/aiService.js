@@ -15,18 +15,38 @@ class AIService {
       return this.cachedModels;
     }
     
-    console.log('Fetching models from:', `${this.baseURL}/v1/models`);
-    const response = await fetch(`${this.baseURL}/v1/models`, {
+    if (!this.baseURL || !this.apiKey) {
+      console.error('Missing API configuration:', { 
+        baseURL: this.baseURL || 'NOT SET', 
+        apiKey: this.apiKey ? 'SET' : 'NOT SET' 
+      });
+      throw new Error('API configuration missing: baseURL or apiKey not set');
+    }
+    
+    console.log('Fetching models from:', `${this.baseURL}/models`);
+    const response = await fetch(`${this.baseURL}/models`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${this.apiKey}`,
         "Content-Type": "application/json"
-      },
-      // Accept self-signed certificates for internal services
-      agent: process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+      }
     });
     
+    console.log('Models API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Models API error:', response.status, errorText);
+      throw new Error(`Failed to fetch models: ${response.status} ${errorText}`);
+    }
+    
     const result = await response.json();
+    console.log('Models API response:', result);
+    
+    if (!result.data || result.data.length === 0) {
+      throw new Error('No models available from API');
+    }
+    
     this.cachedModels = result;
     
     // Cache a suitable chat model as default - prefer llama-3.1-8b-instant for tool support
@@ -226,7 +246,7 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         requestBody.tool_choice = 'auto';
       }
 
-      const response = await fetch(`${this.baseURL}/v1/chat/completions`, {
+      const response = await fetch(`${this.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
