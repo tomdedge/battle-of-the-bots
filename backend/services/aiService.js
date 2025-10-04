@@ -7,14 +7,7 @@ class AIService {
     this.apiKey = process.env.LLM_API_KEY;
     this.cachedModels = null;
     this.defaultModel = null;
-    this.isHuggingFace = this.baseURL && this.baseURL.includes('huggingface.co');
-    this.isMock = this.baseURL === 'mock' || this.baseURL === 'test';
-    console.log('AIService initialized with:', { 
-      baseURL: this.baseURL, 
-      apiKey: this.apiKey ? 'SET' : 'NOT SET',
-      isHuggingFace: this.isHuggingFace,
-      isMock: this.isMock
-    });
+    console.log('AIService initialized with:', { baseURL: this.baseURL, apiKey: this.apiKey ? 'SET' : 'NOT SET' });
   }
 
   async getModels() {
@@ -22,18 +15,8 @@ class AIService {
       return this.cachedModels;
     }
     
-    if (this.isHuggingFace) {
-      // For Hugging Face, we know the model from the URL
-      const modelName = this.baseURL.split('/models/')[1] || 'huggingface-model';
-      this.cachedModels = {
-        data: [{ id: modelName, object: 'model' }]
-      };
-      return this.cachedModels;
-    }
-    
-    const modelsUrl = this.baseURL.endsWith('/v1') ? `${this.baseURL}/models` : `${this.baseURL}/v1/models`;
-    console.log('Fetching models from:', modelsUrl);
-    const response = await fetch(modelsUrl, {
+    console.log('Fetching models from:', `${this.baseURL}/v1/models`);
+    const response = await fetch(`${this.baseURL}/v1/models`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${this.apiKey}`,
@@ -46,16 +29,21 @@ class AIService {
     const result = await response.json();
     this.cachedModels = result;
     
-    // Cache a suitable chat model as default
+    // Cache a suitable chat model as default - prefer llama-3.1-8b-instant for tool support
     if (result.data && result.data.length > 0) {
-      // Prefer llama models for chat
-      const chatModel = result.data.find(model => 
-        model.id.includes('llama') || 
-        model.id.includes('mixtral') || 
-        model.id.includes('gemma') ||
-        model.id.includes('qwen')
-      );
-      this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
+      // First try to find llama-3.1-8b-instant specifically (supports tools)
+      const preferredModel = result.data.find(model => model.id === 'llama-3.1-8b-instant');
+      if (preferredModel) {
+        this.defaultModel = preferredModel.id;
+      } else {
+        // Fallback to other llama models that support tools
+        const chatModel = result.data.find(model => 
+          model.id.includes('llama') || 
+          model.id.includes('mixtral') || 
+          model.id.includes('gemma')
+        );
+        this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
+      }
     }
     
     return result;
@@ -238,129 +226,32 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         requestBody.tool_choice = 'auto';
       }
 
-      let response;
-      
-      if (this.isMock) {
-        // Mock AI responses for testing
-        const mockResponses = [
-          "Hello! I'm Aurora, your AI assistant. How can I help you today?",
-          "I'm doing well, thank you for asking! What can I assist you with?",
-          "That's an interesting question. Let me help you with that.",
-          "I'm here to help with your tasks and calendar. What would you like to do?"
-        ];
-        const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-        
-        // Simulate API response format
-        const mockData = {
-          choices: [{
-            message: {
-              content: randomResponse,
-              tool_calls: null
-            }
-          }]
-        };
-        
-        return {
-          response: randomResponse,
-          executedTools
-        };
-      } else if (this.isHuggingFace) {
-        // Hugging Face Inference API format
-        const lastMessage = conversationMessages[conversationMessages.length - 1];
-        const huggingFaceBody = {
-          inputs: lastMessage.content,
-          parameters: {
-            max_new_tokens: 150,
-            temperature: 0.7,
-            return_full_text: false
-          }
-        };
-        
-        console.log('🤗 Hugging Face API Request:');
-        console.log('URL:', this.baseURL);
-        console.log('Headers:', {
+      const response = await fetch(`${this.baseURL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey.substring(0, 10)}...`
-        });
-        console.log('Body:', JSON.stringify(huggingFaceBody, null, 2));
-        
-        response = await fetch(this.baseURL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          },
-          body: JSON.stringify(huggingFaceBody)
-        });
-        
-        console.log('🤗 Hugging Face Response Status:', response.status, response.statusText);
-        console.log('🤗 Response Headers:', Object.fromEntries(response.headers.entries()));
-      } else {
-        const chatUrl = this.baseURL.endsWith('/v1') ? `${this.baseURL}/chat/completions` : `${this.baseURL}/v1/chat/completions`;
-        response = await fetch(chatUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Ancestry-IsInternal': 'true',
-            'Ancestry-ClientPath': 'auraflow',
-            'Authorization': `Bearer ${this.apiKey}`
-          },
-          body: JSON.stringify(requestBody)
-        });
-      }
+          'Ancestry-IsInternal': 'true',
+          'Ancestry-ClientPath': 'auraflow',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      });
 
-      let data;
-      try {
-        const responseText = await response.text();
-        console.log('📝 Raw API response (first 500 chars):', responseText.substring(0, 500));
-        console.log('📝 Response length:', responseText.length);
-        
-        if (responseText.trim() === 'Not Found') {
-          throw new Error(`Model not found or not available: ${this.baseURL}`);
-        }
-        
-        data = JSON.parse(responseText);
-        console.log('✅ Successfully parsed JSON response');
-      } catch (parseError) {
-        console.error('❌ Failed to parse API response as JSON:', parseError.message);
-        console.error('🔍 Response was likely not JSON format');
-        throw new Error(`Invalid API response format: ${parseError.message}`);
-      }
+      const data = await response.json();
       
       if (!response.ok) {
         console.error('API error response:', data);
         throw new Error(`API error: ${data.error?.message || response.statusText}`);
       }
       
-      let aiMessage;
-      let finalResponse;
-      
-      if (this.isHuggingFace) {
-        // Hugging Face returns array of generated text
-        if (Array.isArray(data) && data[0] && data[0].generated_text) {
-          let generatedText = data[0].generated_text.trim();
-          
-          // DialoGPT sometimes includes the input, so remove it
-          const lastMessage = conversationMessages[conversationMessages.length - 1];
-          if (generatedText.startsWith(lastMessage.content)) {
-            generatedText = generatedText.substring(lastMessage.content.length).trim();
-          }
-          
-          finalResponse = generatedText || "I'm here to help! What can I do for you?";
-          aiMessage = { content: finalResponse, tool_calls: null };
-        } else {
-          console.error('Unexpected Hugging Face response structure:', data);
-          throw new Error('Invalid Hugging Face response structure');
-        }
-      } else {
-        // OpenAI-compatible format
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-          console.error('Unexpected API response structure:', data);
-          throw new Error('Invalid API response structure');
-        }
-        aiMessage = data.choices[0].message;
-        finalResponse = aiMessage.content;
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error('Unexpected API response structure:', data);
+        throw new Error('Invalid API response structure');
       }
+      
+      const aiMessage = data.choices[0].message;
+
+      let finalResponse = aiMessage.content;
 
       // Handle tool calls
       if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
@@ -470,8 +361,7 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         let iteration = 0;
         
         while (iteration < maxIterations) {
-          const followUpUrl = this.baseURL.endsWith('/v1') ? `${this.baseURL}/chat/completions` : `${this.baseURL}/v1/chat/completions`;
-          const followUpResponse = await fetch(followUpUrl, {
+          const followUpResponse = await fetch(`${this.baseURL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
