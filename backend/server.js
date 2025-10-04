@@ -92,6 +92,47 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Public routes
+app.get('/privacy', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html><head><title>Privacy Policy - AuraFlow</title></head>
+    <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+      <h1>Privacy Policy</h1>
+      <p><strong>Last updated:</strong> ${new Date().toLocaleDateString()}</p>
+      <h2>Information We Collect</h2>
+      <p>We collect information you provide when using our service, including Google account information for authentication and calendar/task integration.</p>
+      <h2>How We Use Information</h2>
+      <p>We use your information to provide and improve our AI assistant service, including calendar and task management features.</p>
+      <h2>Data Security</h2>
+      <p>We implement appropriate security measures to protect your personal information.</p>
+      <h2>Contact</h2>
+      <p>For questions about this privacy policy, please contact us through our application.</p>
+    </body></html>
+  `);
+});
+
+app.get('/terms-of-service', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html><head><title>Terms of Service - AuraFlow</title></head>
+    <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+      <h1>Terms of Service</h1>
+      <p><strong>Last updated:</strong> ${new Date().toLocaleDateString()}</p>
+      <h2>Acceptance of Terms</h2>
+      <p>By using AuraFlow, you agree to these terms of service.</p>
+      <h2>Service Description</h2>
+      <p>AuraFlow is an AI-powered personal assistant that helps with calendar management, task organization, and productivity.</p>
+      <h2>User Responsibilities</h2>
+      <p>You are responsible for maintaining the confidentiality of your account and for all activities under your account.</p>
+      <h2>Limitation of Liability</h2>
+      <p>The service is provided "as is" without warranties of any kind.</p>
+      <h2>Contact</h2>
+      <p>For questions about these terms, please contact us through our application.</p>
+    </body></html>
+  `);
+});
+
 // Verification function to check Aurora's work and assist with completion
 async function verifyTaskScheduling(userId, originalMessage, aiResponse) {
   try {
