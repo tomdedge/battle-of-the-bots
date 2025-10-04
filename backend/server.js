@@ -127,7 +127,11 @@ if (process.env.NODE_ENV === 'production') {
   
   // Handle React Router - send all non-API requests to index.html
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api/') && !req.path.startsWith('/auth/') && !req.path.startsWith('/privacy') && !req.path.startsWith('/terms-of-service')) {
+    if (!req.path.startsWith('/api/') && 
+        !req.path.startsWith('/auth/') && 
+        !req.path.startsWith('/static/') && 
+        !req.path.startsWith('/privacy') && 
+        !req.path.startsWith('/terms-of-service')) {
       res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
     }
   });
