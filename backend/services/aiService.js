@@ -59,15 +59,28 @@ class AIService {
         this.defaultModel = preferredModel.id;
         console.log('✅ Selected preferred model for tool support:', this.defaultModel);
       } else {
-        // Fallback to other llama models that support tools
+        // Fallback to other chat models that support tools (exclude whisper, etc.)
         const chatModel = result.data.find(model => 
-          model.id.includes('llama') || 
-          model.id.includes('mixtral') || 
-          model.id.includes('gemma')
+          (model.id.includes('llama') || 
+           model.id.includes('mixtral') || 
+           model.id.includes('gemma')) &&
+          !model.id.includes('whisper') &&
+          !model.id.includes('distil')
         );
-        this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
-        console.log('⚠️  Fallback model selected:', this.defaultModel, '(may not support tools)');
+        
+        if (chatModel) {
+          this.defaultModel = chatModel.id;
+          console.log('⚠️  Fallback chat model selected:', this.defaultModel);
+        } else {
+          // Force llama-3.1-8b-instant if no suitable model found
+          this.defaultModel = 'llama-3.1-8b-instant';
+          console.log('🔧 Forcing llama-3.1-8b-instant as fallback');
+        }
       }
+    } else {
+      // No models returned, force the known working model
+      this.defaultModel = 'llama-3.1-8b-instant';
+      console.log('🔧 No models from API, forcing llama-3.1-8b-instant');
     }
     
     return result;
