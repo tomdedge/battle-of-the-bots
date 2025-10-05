@@ -392,7 +392,7 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
         let iteration = 0;
         
         while (iteration < maxIterations) {
-          const followUpResponse = await fetch(`${this.baseURL}/v1/chat/completions`, {
+          const followUpResponse = await fetch(`${this.baseURL}/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
