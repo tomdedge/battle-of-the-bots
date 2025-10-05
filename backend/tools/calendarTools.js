@@ -10,14 +10,26 @@ class CalendarTools {
           type: 'object',
           properties: {
             userId: { type: 'string', description: 'User ID' },
-            title: { type: 'string', description: 'Event title' },
+            summary: { type: 'string', description: 'Event title/summary' },
             description: { type: 'string', description: 'Event description' },
-            startDateTime: { type: 'string', description: 'Start date/time (ISO format)' },
-            endDateTime: { type: 'string', description: 'End date/time (ISO format)' },
+            start: { 
+              type: 'object',
+              properties: {
+                dateTime: { type: 'string', description: 'Start date/time (ISO format)' }
+              },
+              required: ['dateTime']
+            },
+            end: { 
+              type: 'object',
+              properties: {
+                dateTime: { type: 'string', description: 'End date/time (ISO format)' }
+              },
+              required: ['dateTime']
+            },
             location: { type: 'string', description: 'Event location' },
             attendees: { type: 'array', items: { type: 'string' }, description: 'Attendee emails' }
           },
-          required: ['userId', 'title', 'startDateTime', 'endDateTime']
+          required: ['userId', 'summary', 'start', 'end']
         }
       },
       {
@@ -84,14 +96,14 @@ class CalendarTools {
   }
 
   static async createEvent(args) {
-    const { userId, title, description, startDateTime, endDateTime, location, attendees } = args;
+    const { userId, summary, description, start, end, location, attendees } = args;
     
     const eventData = {
-      summary: title,
+      summary,
       description,
       location,
-      start: { dateTime: startDateTime },
-      end: { dateTime: endDateTime },
+      start: { dateTime: start.dateTime },
+      end: { dateTime: end.dateTime },
       attendees: attendees?.map(email => ({ email }))
     };
 

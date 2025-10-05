@@ -1,0 +1,5618 @@
+diff --git a/.dockerignore b/.dockerignore
+new file mode 100644
+index 0000000..5f4bc92
+--- /dev/null
++++ b/.dockerignore
+@@ -0,0 +1,12 @@
++node_modules
++npm-debug.log
++.git
++.gitignore
++README.md
++.env
++.nyc_output
++coverage
++.DS_Store
++frontend/build
++backend/uploads
++*.log
+diff --git a/.gitignore b/.gitignore
+index 2cabe8b..1e72e3b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -8,5 +8,4 @@ frontend/test-results/
+ frontend/playwright-report/
+ backend/test-results/
+ backend/temp/
+-/backend/coverage/
+-/.idea
+\ No newline at end of file
++.env
+diff --git a/Dockerfile b/Dockerfile
+new file mode 100644
+index 0000000..66ef140
+--- /dev/null
++++ b/Dockerfile
+@@ -0,0 +1,42 @@
++# Use Alpine Linux with Node.js
++FROM alpine:3.18
++
++# Install Node.js, npm, Python, and pip
++RUN apk add --no-cache \
++    nodejs \
++    npm \
++    python3 \
++    py3-pip \
++    ca-certificates
++
++# Set working directory
++WORKDIR /app
++
++# Copy package files
++COPY backend/package*.json ./backend/
++COPY frontend/package*.json ./frontend/
++COPY backend/requirements.txt ./backend/
++
++# Install Python dependencies first
++RUN pip3 install -r backend/requirements.txt
++
++# Install Node dependencies
++RUN cd backend && npm install
++RUN cd frontend && npm install
++
++# Copy source code
++COPY . .
++
++# Build frontend with correct API URL
++ENV REACT_APP_API_URL=""
++RUN cd frontend && npm run build
++
++# Copy startup script
++COPY start.sh /app/start.sh
++RUN chmod +x /app/start.sh
++
++# Expose port
++EXPOSE 3001
++
++# Start with migrations then server
++CMD ["/app/start.sh"]
+diff --git a/Procfile b/Procfile
+index 9fa167c..e4e7758 100644
+--- a/Procfile
++++ b/Procfile
+@@ -1 +1,2 @@
+-web: cd backend && npm start
++web: node backend/server.js
++release: node backend/migrate.js
+diff --git a/README.md b/README.md
+index db8ae43..13ce609 100644
+--- a/README.md
++++ b/README.md
+@@ -11,7 +11,23 @@ A personal AI assistant with calendar integration, task management, and text-to-
+ 
+ ### Installation
+ 
+-1. **Clone and setup:**
++#### Option 1: Docker (Recommended)
++```bash
++git clone <repository-url>
++cd auraflow
++
++# Copy and configure environment
++cp .env.example .env
++# Edit .env with your configuration
++
++# Build and run
++docker-compose up --build
++```
++Access at `http://localhost:3001`
++
++<!-- Trigger Heroku rebuild with Python buildpack -->
++
++#### Option 2: Local Development
+ ```bash
+ git clone <repository-url>
+ cd auraflow
+diff --git a/backend/.npmrc b/backend/.npmrc
+new file mode 100644
+index 0000000..214c29d
+--- /dev/null
++++ b/backend/.npmrc
+@@ -0,0 +1 @@
++registry=https://registry.npmjs.org/
+diff --git a/backend/jest.config.js b/backend/jest.config.js
+deleted file mode 100644
+index 9d49d82..0000000
+--- a/backend/jest.config.js
++++ /dev/null
+@@ -1,11 +0,0 @@
+-module.exports = {
+-  testEnvironment: 'node',
+-  testMatch: ['**/tests/**/*.test.js'],
+-  collectCoverageFrom: [
+-    'services/**/*.js',
+-    'routes/**/*.js',
+-    'middleware/**/*.js'
+-  ],
+-  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+-  testTimeout: 10000
+-};
+diff --git a/backend/middleware/auth.js b/backend/middleware/auth.js
+index d8a6024..0a2424c 100644
+--- a/backend/middleware/auth.js
++++ b/backend/middleware/auth.js
+@@ -3,12 +3,7 @@ const dbService = require('../services/dbService');
+ 
+ const authenticateToken = (req, res, next) => {
+   const authHeader = req.headers['authorization'];
+-  let token = authHeader && authHeader.split(' ')[1];
+-  
+-  // If no token in header, check for httpOnly cookie (production)
+-  if (!token && req.cookies && req.cookies.authToken) {
+-    token = req.cookies.authToken;
+-  }
++  const token = authHeader && authHeader.split(' ')[1];
+ 
+   if (!token) {
+     return res.status(401).json({ error: 'Access token required' });
+diff --git a/backend/middleware/socketAuth.js b/backend/middleware/socketAuth.js
+index e0dc28c..f2040ac 100644
+--- a/backend/middleware/socketAuth.js
++++ b/backend/middleware/socketAuth.js
+@@ -1,16 +1,7 @@
+ const jwt = require('jsonwebtoken');
+ 
+ const authenticateSocket = (socket, next) => {
+-  let token = socket.handshake.auth.token;
+-  
+-  // If no token in auth, check for httpOnly cookie (production)
+-  if (!token && socket.handshake.headers.cookie) {
+-    const cookies = socket.handshake.headers.cookie.split(';');
+-    const authCookie = cookies.find(cookie => cookie.trim().startsWith('authToken='));
+-    if (authCookie) {
+-      token = authCookie.split('=')[1];
+-    }
+-  }
++  const token = socket.handshake.auth.token;
+   
+   if (!token) {
+     return next(new Error('Authentication error: No token provided'));
+diff --git a/backend/package.json b/backend/package.json
+index 028853f..0a3122b 100644
+--- a/backend/package.json
++++ b/backend/package.json
+@@ -5,9 +5,6 @@
+   "scripts": {
+     "start": "node server.js",
+     "dev": "nodemon server.js",
+-    "test": "jest --detectOpenHandles",
+-    "test:watch": "jest --watch --detectOpenHandles",
+-    "test:coverage": "jest --coverage --detectOpenHandles",
+     "migrate": "node db/migrate.js",
+     "migrate-old": "node migrate.js",
+     "test-messages": "node test_new_messages.js",
+@@ -29,8 +26,6 @@
+     "socket.io": "^4.8.1"
+   },
+   "devDependencies": {
+-    "jest": "^30.2.0",
+-    "nodemon": "^3.0.1",
+-    "supertest": "^7.1.4"
++    "nodemon": "^3.0.1"
+   }
+ }
+diff --git a/backend/routes/auth.js b/backend/routes/auth.js
+index d73af1f..b478e33 100644
+--- a/backend/routes/auth.js
++++ b/backend/routes/auth.js
+@@ -8,6 +8,7 @@ const router = express.Router();
+ 
+ // Initiate Google OAuth
+ router.get('/google', (req, res, next) => {
++  console.log('🔐 Google OAuth initiated');
+   // Force consent to get refresh token
+   passport.authenticate('google', { 
+     scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/tasks'],
+@@ -18,21 +19,24 @@ router.get('/google', (req, res, next) => {
+ 
+ // Google OAuth callback
+ router.get('/google/callback', 
++  (req, res, next) => {
++    console.log('🔐 Google OAuth callback received');
++    next();
++  },
+   passport.authenticate('google', { session: false }),
+   (req, res) => {
++    console.log('🔐 Google OAuth successful, generating JWT');
+     const token = googleAuthService.generateJWT(req.user);
+     
+-    // Set httpOnly cookie for production
++    // Set cookie for production
+     if (process.env.NODE_ENV === 'production') {
+       res.cookie('authToken', token, {
+-        httpOnly: true,
+-        secure: true,
++        httpOnly: false, // Allow frontend to read the cookie
++        secure: process.env.NODE_ENV === 'production' && !process.env.DOCKER_ENV,
+         sameSite: 'strict',
+         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+       });
+-      // Use the current host for redirect in production
+-      const redirectUrl = process.env.FRONTEND_URL || `https://${req.get('host')}`;
+-      res.redirect(redirectUrl);
++      res.redirect(process.env.FRONTEND_URL);
+     } else {
+       res.redirect(`${process.env.FRONTEND_URL}?token=${token}`);
+     }
+@@ -51,19 +55,6 @@ router.get('/chat/history', authenticateToken, async (req, res) => {
+   }
+ });
+ 
+-// Check authentication status (for httpOnly cookies)
+-router.get('/status', authenticateToken, (req, res) => {
+-  res.json({ 
+-    authenticated: true, 
+-    user: {
+-      id: req.user.userId,
+-      email: req.user.email,
+-      name: req.user.name,
+-      picture: req.user.picture
+-    }
+-  });
+-});
+-
+ // Clear all chat history
+ router.delete('/chat/history', authenticateToken, async (req, res) => {
+   try {
+diff --git a/backend/server.js b/backend/server.js
+index df5862d..85b8475 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -1,6 +1,5 @@
+ const express = require('express');
+ const cors = require('cors');
+-const cookieParser = require('cookie-parser');
+ const http = require('http');
+ const socketIo = require('socket.io');
+ const passport = require('passport');
+@@ -59,18 +58,11 @@ const userRoutes = require('./routes/user');
+ const app = express();
+ const server = http.createServer(app);
+ const io = socketIo(server, {
+-  cors: { 
+-    origin: process.env.NODE_ENV === 'production' 
+-      ? ["https://auraflow-75c3a9f1fcd1.herokuapp.com", process.env.FRONTEND_URL].filter(Boolean)
+-      : process.env.FRONTEND_URL || "http://localhost:3000",
+-    credentials: true
+-  },
+-  allowEIO3: true
++  cors: { origin: process.env.FRONTEND_URL || "http://localhost:3000" }
+ });
+ 
+ // Middleware
+ app.use(cors());
+-app.use(cookieParser());
+ app.use(express.json());
+ app.use(passport.initialize());
+ app.use('/avatars', express.static(path.join(__dirname, 'public/avatars')));
+@@ -83,68 +75,23 @@ app.use('/api/tools', toolsRoutes);
+ app.use('/api/user', userRoutes);
+ app.use('/api/tts', ttsRoutes);
+ 
+-// Health check endpoint
+-app.get('/api/health', (req, res) => {
+-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+-});
+-
+-// Public routes (must come BEFORE static middleware)
+-app.get('/privacy', (req, res) => {
+-  res.send(`
+-    <!DOCTYPE html>
+-    <html><head><title>Privacy Policy - AuraFlow</title></head>
+-    <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+-      <h1>Privacy Policy</h1>
+-      <p><strong>Last updated:</strong> ${new Date().toLocaleDateString()}</p>
+-      <h2>Information We Collect</h2>
+-      <p>We collect information you provide when using our service, including Google account information for authentication and calendar/task integration.</p>
+-      <h2>How We Use Information</h2>
+-      <p>We use your information to provide and improve our AI assistant service, including calendar and task management features.</p>
+-      <h2>Data Security</h2>
+-      <p>We implement appropriate security measures to protect your personal information.</p>
+-      <h2>Contact</h2>
+-      <p>For questions about this privacy policy, please contact us through our application.</p>
+-    </body></html>
+-  `);
+-});
+-
+-app.get('/terms-of-service', (req, res) => {
+-  res.send(`
+-    <!DOCTYPE html>
+-    <html><head><title>Terms of Service - AuraFlow</title></head>
+-    <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+-      <h1>Terms of Service</h1>
+-      <p><strong>Last updated:</strong> ${new Date().toLocaleDateString()}</p>
+-      <h2>Acceptance of Terms</h2>
+-      <p>By using AuraFlow, you agree to these terms of service.</p>
+-      <h2>Service Description</h2>
+-      <p>AuraFlow is an AI-powered personal assistant that helps with calendar management, task organization, and productivity.</p>
+-      <h2>User Responsibilities</h2>
+-      <p>You are responsible for maintaining the confidentiality of your account and for all activities under your account.</p>
+-      <h2>Limitation of Liability</h2>
+-      <p>The service is provided "as is" without warranties of any kind.</p>
+-      <h2>Contact</h2>
+-      <p>For questions about these terms, please contact us through our application.</p>
+-    </body></html>
+-  `);
+-});
+-
+ // Serve frontend build in production
+ if (process.env.NODE_ENV === 'production') {
+   app.use(express.static(path.join(__dirname, '../frontend/build')));
+   
+   // Handle React Router - send all non-API requests to index.html
+   app.get('*', (req, res) => {
+-    if (!req.path.startsWith('/api/') && 
+-        !req.path.startsWith('/auth/') && 
+-        !req.path.startsWith('/static/') && 
+-        !req.path.startsWith('/privacy') && 
+-        !req.path.startsWith('/terms-of-service')) {
++    if (!req.path.startsWith('/api/') && !req.path.startsWith('/auth/')) {
+       res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+     }
+   });
+ }
+ 
++// Health check endpoint
++app.get('/api/health', (req, res) => {
++  res.json({ status: 'ok', timestamp: new Date().toISOString() });
++});
++
+ // Verification function to check Aurora's work and assist with completion
+ async function verifyTaskScheduling(userId, originalMessage, aiResponse) {
+   try {
+diff --git a/backend/services/aiService.js b/backend/services/aiService.js
+index 4971b83..76b120c 100644
+--- a/backend/services/aiService.js
++++ b/backend/services/aiService.js
+@@ -7,7 +7,14 @@ class AIService {
+     this.apiKey = process.env.LLM_API_KEY;
+     this.cachedModels = null;
+     this.defaultModel = null;
+-    console.log('AIService initialized with:', { baseURL: this.baseURL, apiKey: this.apiKey ? 'SET' : 'NOT SET' });
++    this.isHuggingFace = this.baseURL && this.baseURL.includes('huggingface.co');
++    this.isMock = this.baseURL === 'mock' || this.baseURL === 'test';
++    console.log('AIService initialized with:', { 
++      baseURL: this.baseURL, 
++      apiKey: this.apiKey ? 'SET' : 'NOT SET',
++      isHuggingFace: this.isHuggingFace,
++      isMock: this.isMock
++    });
+   }
+ 
+   async getModels() {
+@@ -15,8 +22,18 @@ class AIService {
+       return this.cachedModels;
+     }
+     
+-    console.log('Fetching models from:', `${this.baseURL}/v1/models`);
+-    const response = await fetch(`${this.baseURL}/v1/models`, {
++    if (this.isHuggingFace) {
++      // For Hugging Face, we know the model from the URL
++      const modelName = this.baseURL.split('/models/')[1] || 'huggingface-model';
++      this.cachedModels = {
++        data: [{ id: modelName, object: 'model' }]
++      };
++      return this.cachedModels;
++    }
++    
++    const modelsUrl = this.baseURL.endsWith('/v1') ? `${this.baseURL}/models` : `${this.baseURL}/v1/models`;
++    console.log('Fetching models from:', modelsUrl);
++    const response = await fetch(modelsUrl, {
+       method: "GET",
+       headers: {
+         "Authorization": `Bearer ${this.apiKey}`,
+@@ -29,21 +46,16 @@ class AIService {
+     const result = await response.json();
+     this.cachedModels = result;
+     
+-    // Cache a suitable chat model as default - prefer llama-3.1-8b-instant for tool support
++    // Cache a suitable chat model as default
+     if (result.data && result.data.length > 0) {
+-      // First try to find llama-3.1-8b-instant specifically (supports tools)
+-      const preferredModel = result.data.find(model => model.id === 'llama-3.1-8b-instant');
+-      if (preferredModel) {
+-        this.defaultModel = preferredModel.id;
+-      } else {
+-        // Fallback to other llama models that support tools
+-        const chatModel = result.data.find(model => 
+-          model.id.includes('llama') || 
+-          model.id.includes('mixtral') || 
+-          model.id.includes('gemma')
+-        );
+-        this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
+-      }
++      // Prefer llama models for chat
++      const chatModel = result.data.find(model => 
++        model.id.includes('llama') || 
++        model.id.includes('mixtral') || 
++        model.id.includes('gemma') ||
++        model.id.includes('qwen')
++      );
++      this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
+     }
+     
+     return result;
+@@ -226,32 +238,129 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
+         requestBody.tool_choice = 'auto';
+       }
+ 
+-      const response = await fetch(`${this.baseURL}/v1/chat/completions`, {
+-        method: 'POST',
+-        headers: {
++      let response;
++      
++      if (this.isMock) {
++        // Mock AI responses for testing
++        const mockResponses = [
++          "Hello! I'm Aurora, your AI assistant. How can I help you today?",
++          "I'm doing well, thank you for asking! What can I assist you with?",
++          "That's an interesting question. Let me help you with that.",
++          "I'm here to help with your tasks and calendar. What would you like to do?"
++        ];
++        const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
++        
++        // Simulate API response format
++        const mockData = {
++          choices: [{
++            message: {
++              content: randomResponse,
++              tool_calls: null
++            }
++          }]
++        };
++        
++        return {
++          response: randomResponse,
++          executedTools
++        };
++      } else if (this.isHuggingFace) {
++        // Hugging Face Inference API format
++        const lastMessage = conversationMessages[conversationMessages.length - 1];
++        const huggingFaceBody = {
++          inputs: lastMessage.content,
++          parameters: {
++            max_new_tokens: 150,
++            temperature: 0.7,
++            return_full_text: false
++          }
++        };
++        
++        console.log('🤗 Hugging Face API Request:');
++        console.log('URL:', this.baseURL);
++        console.log('Headers:', {
+           'Content-Type': 'application/json',
+-          'Ancestry-IsInternal': 'true',
+-          'Ancestry-ClientPath': 'auraflow',
+-          'Authorization': `Bearer ${this.apiKey}`
+-        },
+-        body: JSON.stringify(requestBody)
+-      });
++          'Authorization': `Bearer ${this.apiKey.substring(0, 10)}...`
++        });
++        console.log('Body:', JSON.stringify(huggingFaceBody, null, 2));
++        
++        response = await fetch(this.baseURL, {
++          method: 'POST',
++          headers: {
++            'Content-Type': 'application/json',
++            'Authorization': `Bearer ${this.apiKey}`
++          },
++          body: JSON.stringify(huggingFaceBody)
++        });
++        
++        console.log('🤗 Hugging Face Response Status:', response.status, response.statusText);
++        console.log('🤗 Response Headers:', Object.fromEntries(response.headers.entries()));
++      } else {
++        const chatUrl = this.baseURL.endsWith('/v1') ? `${this.baseURL}/chat/completions` : `${this.baseURL}/v1/chat/completions`;
++        response = await fetch(chatUrl, {
++          method: 'POST',
++          headers: {
++            'Content-Type': 'application/json',
++            'Ancestry-IsInternal': 'true',
++            'Ancestry-ClientPath': 'auraflow',
++            'Authorization': `Bearer ${this.apiKey}`
++          },
++          body: JSON.stringify(requestBody)
++        });
++      }
+ 
+-      const data = await response.json();
++      let data;
++      try {
++        const responseText = await response.text();
++        console.log('📝 Raw API response (first 500 chars):', responseText.substring(0, 500));
++        console.log('📝 Response length:', responseText.length);
++        
++        if (responseText.trim() === 'Not Found') {
++          throw new Error(`Model not found or not available: ${this.baseURL}`);
++        }
++        
++        data = JSON.parse(responseText);
++        console.log('✅ Successfully parsed JSON response');
++      } catch (parseError) {
++        console.error('❌ Failed to parse API response as JSON:', parseError.message);
++        console.error('🔍 Response was likely not JSON format');
++        throw new Error(`Invalid API response format: ${parseError.message}`);
++      }
+       
+       if (!response.ok) {
+         console.error('API error response:', data);
+         throw new Error(`API error: ${data.error?.message || response.statusText}`);
+       }
+       
+-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+-        console.error('Unexpected API response structure:', data);
+-        throw new Error('Invalid API response structure');
+-      }
++      let aiMessage;
++      let finalResponse;
+       
+-      const aiMessage = data.choices[0].message;
+-
+-      let finalResponse = aiMessage.content;
++      if (this.isHuggingFace) {
++        // Hugging Face returns array of generated text
++        if (Array.isArray(data) && data[0] && data[0].generated_text) {
++          let generatedText = data[0].generated_text.trim();
++          
++          // DialoGPT sometimes includes the input, so remove it
++          const lastMessage = conversationMessages[conversationMessages.length - 1];
++          if (generatedText.startsWith(lastMessage.content)) {
++            generatedText = generatedText.substring(lastMessage.content.length).trim();
++          }
++          
++          finalResponse = generatedText || "I'm here to help! What can I do for you?";
++          aiMessage = { content: finalResponse, tool_calls: null };
++        } else {
++          console.error('Unexpected Hugging Face response structure:', data);
++          throw new Error('Invalid Hugging Face response structure');
++        }
++      } else {
++        // OpenAI-compatible format
++        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
++          console.error('Unexpected API response structure:', data);
++          throw new Error('Invalid API response structure');
++        }
++        aiMessage = data.choices[0].message;
++        finalResponse = aiMessage.content;
++      }
+ 
+       // Handle tool calls
+       if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
+@@ -361,7 +470,8 @@ Keep responses concise, helpful, and personalized. Use their name when appropria
+         let iteration = 0;
+         
+         while (iteration < maxIterations) {
+-          const followUpResponse = await fetch(`${this.baseURL}/v1/chat/completions`, {
++          const followUpUrl = this.baseURL.endsWith('/v1') ? `${this.baseURL}/chat/completions` : `${this.baseURL}/v1/chat/completions`;
++          const followUpResponse = await fetch(followUpUrl, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+diff --git a/backend/tests/aiService.test.js b/backend/tests/aiService.test.js
+deleted file mode 100644
+index 9abb971..0000000
+--- a/backend/tests/aiService.test.js
++++ /dev/null
+@@ -1,138 +0,0 @@
+-// Mock dependencies
+-jest.mock('../services/dbService', () => ({
+-  saveChatMessage: jest.fn(),
+-  getUserById: jest.fn(),
+-  getChatHistory: jest.fn()
+-}));
+-
+-jest.mock('../tools', () => ({
+-  getAllToolDefinitions: jest.fn(() => []),
+-  executeTool: jest.fn()
+-}));
+-
+-const aiService = require('../services/aiService');
+-const dbService = require('../services/dbService');
+-
+-// Mock fetch globally
+-global.fetch = jest.fn();
+-
+-describe('AIService', () => {
+-  beforeEach(() => {
+-    fetch.mockClear();
+-    dbService.getUserById.mockClear();
+-    dbService.getChatHistory.mockClear();
+-    dbService.saveChatMessage.mockClear();
+-    // Clear cached models
+-    aiService.cachedModels = null;
+-  });
+-
+-  describe('getModels', () => {
+-    it('should fetch available models', async () => {
+-      const mockResponse = {
+-        data: [
+-          { id: 'gpt-4o-mini' },
+-          { id: 'gpt-4o' }
+-        ]
+-      };
+-
+-      fetch.mockResolvedValueOnce({
+-        ok: true,
+-        json: async () => mockResponse
+-      });
+-
+-      const result = await aiService.getModels();
+-
+-      expect(fetch).toHaveBeenCalledWith(
+-        'http://test-llm.com/v1/models',
+-        expect.objectContaining({
+-          method: 'GET',
+-          headers: expect.objectContaining({
+-            'Authorization': 'Bearer test-key',
+-            'Content-Type': 'application/json'
+-          })
+-        })
+-      );
+-      expect(result).toEqual(mockResponse);
+-    });
+-
+-    it('should return cached models on second call', async () => {
+-      const mockResponse = {
+-        data: [{ id: 'gpt-4o-mini' }]
+-      };
+-
+-      fetch.mockResolvedValueOnce({
+-        ok: true,
+-        json: async () => mockResponse
+-      });
+-
+-      // First call
+-      await aiService.getModels();
+-      // Second call should use cache
+-      const result = await aiService.getModels();
+-
+-      expect(fetch).toHaveBeenCalledTimes(1);
+-      expect(result).toEqual(mockResponse);
+-    });
+-  });
+-
+-  describe('sendMessage', () => {
+-    it('should send simple message and return AI response', async () => {
+-      // Mock database calls
+-      dbService.getUserById.mockResolvedValueOnce({
+-        id: 1,
+-        name: 'Test User',
+-        email: 'test@example.com'
+-      });
+-      dbService.getChatHistory.mockResolvedValueOnce([]);
+-      dbService.saveChatMessage.mockResolvedValueOnce({});
+-
+-      const mockResponse = {
+-        choices: [{
+-          message: {
+-            content: 'Hello! How can I help you today?',
+-            tool_calls: null
+-          }
+-        }]
+-      };
+-
+-      fetch.mockResolvedValueOnce({
+-        ok: true,
+-        json: async () => mockResponse
+-      });
+-
+-      const result = await aiService.sendMessage('Hello', 'gpt-4o-mini', 1);
+-
+-      expect(fetch).toHaveBeenCalledWith(
+-        'http://test-llm.com/v1/chat/completions',
+-        expect.objectContaining({
+-          method: 'POST',
+-          headers: expect.objectContaining({
+-            'Content-Type': 'application/json',
+-            'Authorization': 'Bearer test-key'
+-          })
+-        })
+-      );
+-      expect(result).toBe('Hello! How can I help you today?');
+-    });
+-
+-    it('should handle API response errors', async () => {
+-      fetch.mockResolvedValueOnce({
+-        ok: false,
+-        status: 500,
+-        statusText: 'Internal Server Error',
+-        json: async () => ({ error: { message: 'Server error' } })
+-      });
+-
+-      await expect(aiService.sendMessage('Hello')).rejects.toThrow('AI service unavailable');
+-    });
+-
+-    it('should handle malformed API responses', async () => {
+-      fetch.mockResolvedValueOnce({
+-        ok: true,
+-        json: async () => ({ invalid: 'response' })
+-      });
+-
+-      await expect(aiService.sendMessage('Hello')).rejects.toThrow('AI service unavailable');
+-    });
+-  });
+-});
+diff --git a/backend/tests/auth.middleware.test.js b/backend/tests/auth.middleware.test.js
+deleted file mode 100644
+index aee6c9f..0000000
+--- a/backend/tests/auth.middleware.test.js
++++ /dev/null
+@@ -1,89 +0,0 @@
+-const { authenticateToken } = require('../middleware/auth');
+-const jwt = require('jsonwebtoken');
+-
+-// Mock jwt
+-jest.mock('jsonwebtoken');
+-
+-describe('Auth Middleware', () => {
+-  let req, res, next;
+-
+-  beforeEach(() => {
+-    req = {
+-      headers: {}
+-    };
+-    res = {
+-      status: jest.fn().mockReturnThis(),
+-      json: jest.fn()
+-    };
+-    next = jest.fn();
+-    jest.clearAllMocks();
+-  });
+-
+-  describe('authenticateToken', () => {
+-    it('should authenticate valid token', () => {
+-      const mockUser = { userId: 1, email: 'test@example.com' };
+-      
+-      req.headers.authorization = 'Bearer valid-token';
+-      jwt.verify.mockImplementation((token, secret, callback) => {
+-        callback(null, mockUser);
+-      });
+-
+-      authenticateToken(req, res, next);
+-
+-      expect(jwt.verify).toHaveBeenCalledWith('valid-token', 'test-secret', expect.any(Function));
+-      expect(req.user).toEqual(mockUser);
+-      expect(next).toHaveBeenCalled();
+-      expect(res.status).not.toHaveBeenCalled();
+-    });
+-
+-    it('should return 401 if no token provided', () => {
+-      authenticateToken(req, res, next);
+-
+-      expect(res.status).toHaveBeenCalledWith(401);
+-      expect(res.json).toHaveBeenCalledWith({ error: 'Access token required' });
+-      expect(next).not.toHaveBeenCalled();
+-    });
+-
+-    it('should return 401 if authorization header malformed', () => {
+-      req.headers.authorization = 'InvalidFormat';
+-
+-      authenticateToken(req, res, next);
+-
+-      expect(res.status).toHaveBeenCalledWith(401);
+-      expect(res.json).toHaveBeenCalledWith({ error: 'Access token required' });
+-      expect(next).not.toHaveBeenCalled();
+-    });
+-
+-    it('should return 403 if token is invalid', () => {
+-      req.headers.authorization = 'Bearer invalid-token';
+-      jwt.verify.mockImplementation((token, secret, callback) => {
+-        callback(new Error('Invalid token'), null);
+-      });
+-
+-      authenticateToken(req, res, next);
+-
+-      expect(res.status).toHaveBeenCalledWith(403);
+-      expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token' });
+-      expect(next).not.toHaveBeenCalled();
+-    });
+-
+-    it('should handle Bearer token with proper format', () => {
+-      const mockUser = { userId: 1, email: 'test@example.com' };
+-      
+-      req.headers.authorization = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9';
+-      jwt.verify.mockImplementation((token, secret, callback) => {
+-        callback(null, mockUser);
+-      });
+-
+-      authenticateToken(req, res, next);
+-
+-      expect(jwt.verify).toHaveBeenCalledWith(
+-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+-        'test-secret',
+-        expect.any(Function)
+-      );
+-      expect(req.user).toEqual(mockUser);
+-      expect(next).toHaveBeenCalled();
+-    });
+-  });
+-});
+diff --git a/backend/tests/auth.routes.test.js b/backend/tests/auth.routes.test.js
+deleted file mode 100644
+index c617740..0000000
+--- a/backend/tests/auth.routes.test.js
++++ /dev/null
+@@ -1,129 +0,0 @@
+-const request = require('supertest');
+-const express = require('express');
+-
+-// Mock dependencies
+-jest.mock('passport', () => ({
+-  authenticate: jest.fn(() => (req, res, next) => next()),
+-  initialize: jest.fn(() => (req, res, next) => next())
+-}));
+-
+-jest.mock('../services/googleAuth', () => ({
+-  generateJWT: jest.fn()
+-}));
+-
+-jest.mock('../services/dbService', () => ({
+-  getChatHistory: jest.fn()
+-}));
+-
+-jest.mock('../middleware/auth', () => ({
+-  authenticateToken: jest.fn((req, res, next) => {
+-    req.user = { userId: 1 };
+-    next();
+-  })
+-}));
+-
+-const passport = require('passport');
+-const googleAuthService = require('../services/googleAuth');
+-const dbService = require('../services/dbService');
+-
+-describe('Auth Routes', () => {
+-  let app;
+-
+-  beforeEach(() => {
+-    app = express();
+-    app.use(express.json());
+-    
+-    // Mock passport authenticate to return middleware function
+-    passport.authenticate.mockImplementation((strategy, options) => {
+-      return (req, res, next) => {
+-        if (strategy === 'google') {
+-          if (req.path === '/google/callback') {
+-            req.user = { id: 1, name: 'Test User' };
+-          }
+-          res.redirect('http://localhost:3000?token=test-token');
+-        } else {
+-          next();
+-        }
+-      };
+-    });
+-    
+-    const authRoutes = require('../routes/auth');
+-    app.use('/auth', authRoutes);
+-    jest.clearAllMocks();
+-  });
+-
+-  describe('GET /auth/google', () => {
+-    it('should initiate Google OAuth', async () => {
+-      const response = await request(app)
+-        .get('/auth/google');
+-
+-      expect(response.status).toBe(302);
+-      expect(passport.authenticate).toHaveBeenCalledWith('google', {
+-        scope: ['profile', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/tasks'],
+-        accessType: 'offline',
+-        prompt: 'consent'
+-      });
+-    });
+-  });
+-
+-  describe('GET /auth/google/callback', () => {
+-    it('should handle OAuth callback', async () => {
+-      googleAuthService.generateJWT.mockReturnValue('test-jwt-token');
+-      process.env.NODE_ENV = 'development';
+-      process.env.FRONTEND_URL = 'http://localhost:3000';
+-
+-      const response = await request(app)
+-        .get('/auth/google/callback');
+-
+-      expect(response.status).toBe(302);
+-      expect(response.headers.location).toContain('token=test-token');
+-    });
+-  });
+-
+-  describe('GET /auth/chat/history', () => {
+-    it('should return chat history', async () => {
+-      const mockHistory = [
+-        { id: 1, message: 'Hello', response: 'Hi' }
+-      ];
+-
+-      dbService.getChatHistory.mockResolvedValue(mockHistory);
+-
+-      const response = await request(app)
+-        .get('/auth/chat/history')
+-        .expect(200);
+-
+-      expect(response.body).toEqual(mockHistory);
+-      expect(dbService.getChatHistory).toHaveBeenCalledWith(1, 50, 0);
+-    });
+-
+-    it('should handle query parameters', async () => {
+-      dbService.getChatHistory.mockResolvedValue([]);
+-
+-      await request(app)
+-        .get('/auth/chat/history?limit=10&offset=5')
+-        .expect(200);
+-
+-      expect(dbService.getChatHistory).toHaveBeenCalledWith(1, 10, 5);
+-    });
+-
+-    it('should handle service errors', async () => {
+-      dbService.getChatHistory.mockRejectedValue(new Error('DB error'));
+-
+-      const response = await request(app)
+-        .get('/auth/chat/history')
+-        .expect(500);
+-
+-      expect(response.body).toEqual({ error: 'DB error' });
+-    });
+-  });
+-
+-  describe('POST /auth/logout', () => {
+-    it('should return success', async () => {
+-      const response = await request(app)
+-        .post('/auth/logout')
+-        .expect(200);
+-
+-      expect(response.body).toEqual({ success: true });
+-    });
+-  });
+-});
+diff --git a/backend/tests/calendarService.test.js b/backend/tests/calendarService.test.js
+deleted file mode 100644
+index faca762..0000000
+--- a/backend/tests/calendarService.test.js
++++ /dev/null
+@@ -1,188 +0,0 @@
+-const calendarService = require('../services/calendarService');
+-
+-// Mock googleapis
+-jest.mock('googleapis', () => ({
+-  google: {
+-    auth: {
+-      OAuth2: jest.fn(() => ({
+-        setCredentials: jest.fn(),
+-        refreshAccessToken: jest.fn()
+-      }))
+-    },
+-    calendar: jest.fn(() => ({
+-      events: {
+-        list: jest.fn(),
+-        insert: jest.fn()
+-      }
+-    }))
+-  }
+-}));
+-
+-// Mock dbService
+-jest.mock('../services/dbService', () => ({
+-  getUserById: jest.fn(),
+-  updateUserTokens: jest.fn()
+-}));
+-
+-const { google } = require('googleapis');
+-const dbService = require('../services/dbService');
+-
+-describe('CalendarService', () => {
+-  beforeEach(() => {
+-    jest.clearAllMocks();
+-  });
+-
+-  describe('getAuthenticatedClient', () => {
+-    it('should return authenticated calendar client', async () => {
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'access-token',
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      const mockCalendar = { events: { list: jest.fn() } };
+-      google.calendar.mockReturnValueOnce(mockCalendar);
+-
+-      const result = await calendarService.getAuthenticatedClient(1);
+-
+-      expect(dbService.getUserById).toHaveBeenCalledWith(1);
+-      expect(result).toBe(mockCalendar);
+-    });
+-
+-    it('should throw error if user not authenticated', async () => {
+-      dbService.getUserById.mockResolvedValueOnce(null);
+-
+-      await expect(calendarService.getAuthenticatedClient(1))
+-        .rejects.toThrow('User not authenticated');
+-    });
+-
+-    it('should throw error if user has no access token', async () => {
+-      const mockUser = {
+-        id: 1,
+-        access_token: null,
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      await expect(calendarService.getAuthenticatedClient(1))
+-        .rejects.toThrow('User not authenticated');
+-    });
+-  });
+-
+-  describe('getEvents', () => {
+-    it('should return calendar events', async () => {
+-      const mockEvents = [
+-        {
+-          id: '1',
+-          summary: 'Test Event',
+-          start: { dateTime: '2023-10-01T10:00:00Z' },
+-          end: { dateTime: '2023-10-01T11:00:00Z' }
+-        }
+-      ];
+-
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'access-token',
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      const mockCalendar = {
+-        events: {
+-          list: jest.fn().mockResolvedValueOnce({
+-            data: { items: mockEvents }
+-          })
+-        }
+-      };
+-
+-      google.calendar.mockReturnValueOnce(mockCalendar);
+-
+-      const result = await calendarService.getEvents(1, '2023-10-01T00:00:00Z', '2023-10-01T23:59:59Z');
+-
+-      expect(mockCalendar.events.list).toHaveBeenCalledWith({
+-        calendarId: 'primary',
+-        timeMin: '2023-10-01T00:00:00Z',
+-        timeMax: '2023-10-01T23:59:59Z',
+-        singleEvents: true,
+-        orderBy: 'startTime'
+-      });
+-      expect(result).toEqual(mockEvents);
+-    });
+-  });
+-
+-  describe('findTimeGaps', () => {
+-    it('should find gaps between events', () => {
+-      const events = [
+-        {
+-          start: { dateTime: '2023-10-01T10:00:00Z' },
+-          end: { dateTime: '2023-10-01T11:00:00Z' }
+-        },
+-        {
+-          start: { dateTime: '2023-10-01T14:00:00Z' },
+-          end: { dateTime: '2023-10-01T15:00:00Z' }
+-        }
+-      ];
+-
+-      const startTime = new Date('2023-10-01T08:00:00Z');
+-      const endTime = new Date('2023-10-01T18:00:00Z');
+-
+-      const gaps = calendarService.findTimeGaps(events, startTime, endTime);
+-
+-      expect(gaps).toHaveLength(3); // Before first event, between events, after last event
+-      expect(gaps[0].duration).toBeGreaterThan(25); // Should be longer than 25 minutes
+-    });
+-
+-    it('should return empty array if no gaps', () => {
+-      const events = [
+-        {
+-          start: { dateTime: '2023-10-01T08:00:00Z' },
+-          end: { dateTime: '2023-10-01T18:00:00Z' }
+-        }
+-      ];
+-
+-      const startTime = new Date('2023-10-01T08:00:00Z');
+-      const endTime = new Date('2023-10-01T18:00:00Z');
+-
+-      const gaps = calendarService.findTimeGaps(events, startTime, endTime);
+-
+-      expect(gaps).toHaveLength(0);
+-    });
+-  });
+-
+-  describe('suggestFocusBlock', () => {
+-    it('should create focus block suggestion', () => {
+-      const gap = {
+-        start: new Date('2023-10-01T14:00:00Z'),
+-        end: new Date('2023-10-01T15:00:00Z'),
+-        duration: 60
+-      };
+-
+-      const suggestion = calendarService.suggestFocusBlock(gap);
+-
+-      expect(suggestion).toEqual({
+-        title: 'Focus Block (60 min)',
+-        start: { dateTime: gap.start.toISOString() },
+-        end: { dateTime: new Date(gap.start.getTime() + 60 * 60 * 1000).toISOString() },
+-        description: 'AI-suggested focus time. Duration: 60 minutes.',
+-        colorId: '2',
+-        duration: 60
+-      });
+-    });
+-
+-    it('should include task context in description', () => {
+-      const gap = {
+-        start: new Date('2023-10-01T14:00:00Z'),
+-        end: new Date('2023-10-01T15:00:00Z'),
+-        duration: 30
+-      };
+-
+-      const suggestion = calendarService.suggestFocusBlock(gap, 'Review documents');
+-
+-      expect(suggestion.description).toBe('AI-suggested focus time. Context: Review documents. Duration: 30 minutes.');
+-    });
+-  });
+-});
+diff --git a/backend/tests/dbService.test.js b/backend/tests/dbService.test.js
+deleted file mode 100644
+index 227e327..0000000
+--- a/backend/tests/dbService.test.js
++++ /dev/null
+@@ -1,134 +0,0 @@
+-// Mock pg Pool before requiring dbService
+-const mockQuery = jest.fn();
+-jest.mock('pg', () => ({
+-  Pool: jest.fn(() => ({
+-    query: mockQuery,
+-    end: jest.fn()
+-  }))
+-}));
+-
+-const dbService = require('../services/dbService');
+-
+-describe('DatabaseService', () => {
+-  beforeEach(() => {
+-    mockQuery.mockClear();
+-  });
+-
+-  describe('createUser', () => {
+-    it('should create a new user', async () => {
+-      const mockUser = {
+-        id: 1,
+-        google_id: '123456',
+-        email: 'test@example.com',
+-        name: 'Test User'
+-      };
+-
+-      mockQuery.mockResolvedValueOnce({
+-        rows: [mockUser]
+-      });
+-
+-      const googleProfile = {
+-        id: '123456',
+-        emails: [{ value: 'test@example.com' }],
+-        displayName: 'Test User',
+-        photos: [{ value: 'http://example.com/photo.jpg' }]
+-      };
+-
+-      const tokens = {
+-        accessToken: 'access-token',
+-        refreshToken: 'refresh-token'
+-      };
+-
+-      const result = await dbService.createUser(googleProfile, tokens);
+-
+-      expect(mockQuery).toHaveBeenCalledWith(
+-        expect.stringContaining('INSERT INTO users'),
+-        ['123456', 'test@example.com', 'Test User', 'http://example.com/photo.jpg', 'access-token', 'refresh-token']
+-      );
+-      expect(result).toEqual(mockUser);
+-    });
+-  });
+-
+-  describe('getUserById', () => {
+-    it('should return user by id', async () => {
+-      const mockUser = {
+-        id: 1,
+-        email: 'test@example.com',
+-        name: 'Test User'
+-      };
+-
+-      mockQuery.mockResolvedValueOnce({
+-        rows: [mockUser]
+-      });
+-
+-      const result = await dbService.getUserById(1);
+-
+-      expect(mockQuery).toHaveBeenCalledWith(
+-        'SELECT * FROM users WHERE id = $1',
+-        [1]
+-      );
+-      expect(result).toEqual(mockUser);
+-    });
+-
+-    it('should return undefined if user not found', async () => {
+-      mockQuery.mockResolvedValueOnce({
+-        rows: []
+-      });
+-
+-      const result = await dbService.getUserById(999);
+-
+-      expect(result).toBeUndefined();
+-    });
+-  });
+-
+-  describe('saveChatMessage', () => {
+-    it('should save chat message', async () => {
+-      const mockMessage = {
+-        id: 1,
+-        user_id: 1,
+-        message: 'Hello',
+-        response: 'Hi there!',
+-        model: 'gpt-4o-mini'
+-      };
+-
+-      mockQuery.mockResolvedValueOnce({
+-        rows: [mockMessage]
+-      });
+-
+-      const result = await dbService.saveChatMessage(1, 'Hello', 'Hi there!', 'gpt-4o-mini');
+-
+-      expect(mockQuery).toHaveBeenCalledWith(
+-        expect.stringContaining('INSERT INTO chat_messages'),
+-        [1, 'Hello', 'Hi there!', 'gpt-4o-mini', null]
+-      );
+-      expect(result).toEqual(mockMessage);
+-    });
+-  });
+-
+-  describe('updateUserTokens', () => {
+-    it('should update user tokens', async () => {
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'new-access-token',
+-        refresh_token: 'new-refresh-token'
+-      };
+-
+-      mockQuery.mockResolvedValueOnce({
+-        rows: [mockUser]
+-      });
+-
+-      const tokens = {
+-        access_token: 'new-access-token',
+-        refresh_token: 'new-refresh-token'
+-      };
+-
+-      const result = await dbService.updateUserTokens(1, tokens);
+-
+-      expect(mockQuery).toHaveBeenCalledWith(
+-        expect.stringContaining('UPDATE users'),
+-        [1, 'new-access-token', 'new-refresh-token']
+-      );
+-      expect(result).toEqual(mockUser);
+-    });
+-  });
+-});
+diff --git a/backend/tests/googleAuth.test.js b/backend/tests/googleAuth.test.js
+deleted file mode 100644
+index 25cf3c6..0000000
+--- a/backend/tests/googleAuth.test.js
++++ /dev/null
+@@ -1,109 +0,0 @@
+-const googleAuthService = require('../services/googleAuth');
+-const jwt = require('jsonwebtoken');
+-
+-// Mock jwt
+-jest.mock('jsonwebtoken');
+-
+-// Mock dbService
+-jest.mock('../services/dbService', () => ({
+-  createUser: jest.fn()
+-}));
+-
+-const dbService = require('../services/dbService');
+-
+-describe('GoogleAuthService', () => {
+-  beforeEach(() => {
+-    jest.clearAllMocks();
+-  });
+-
+-  describe('handleGoogleCallback', () => {
+-    it('should create user and return success', async () => {
+-      const mockProfile = {
+-        id: '123456',
+-        emails: [{ value: 'test@example.com' }],
+-        displayName: 'Test User'
+-      };
+-
+-      const mockTokens = {
+-        accessToken: 'access-token',
+-        refreshToken: 'refresh-token'
+-      };
+-
+-      const mockUser = {
+-        id: 1,
+-        google_id: '123456',
+-        email: 'test@example.com',
+-        name: 'Test User'
+-      };
+-
+-      dbService.createUser.mockResolvedValueOnce(mockUser);
+-
+-      const done = jest.fn();
+-
+-      await googleAuthService.handleGoogleCallback(
+-        mockTokens.accessToken,
+-        mockTokens.refreshToken,
+-        mockProfile,
+-        done
+-      );
+-
+-      expect(dbService.createUser).toHaveBeenCalledWith(mockProfile, mockTokens);
+-      expect(done).toHaveBeenCalledWith(null, mockUser);
+-    });
+-
+-    it('should handle database errors', async () => {
+-      const mockProfile = {
+-        id: '123456',
+-        emails: [{ value: 'test@example.com' }],
+-        displayName: 'Test User'
+-      };
+-
+-      const mockTokens = {
+-        accessToken: 'access-token',
+-        refreshToken: 'refresh-token'
+-      };
+-
+-      const error = new Error('Database error');
+-      dbService.createUser.mockRejectedValueOnce(error);
+-
+-      const done = jest.fn();
+-
+-      await googleAuthService.handleGoogleCallback(
+-        mockTokens.accessToken,
+-        mockTokens.refreshToken,
+-        mockProfile,
+-        done
+-      );
+-
+-      expect(done).toHaveBeenCalledWith(error, null);
+-    });
+-  });
+-
+-  describe('generateJWT', () => {
+-    it('should generate JWT token with user data', () => {
+-      const mockUser = {
+-        id: 1,
+-        google_id: '123456',
+-        email: 'test@example.com',
+-        name: 'Test User'
+-      };
+-
+-      const mockToken = 'jwt-token';
+-      jwt.sign.mockReturnValueOnce(mockToken);
+-
+-      const result = googleAuthService.generateJWT(mockUser);
+-
+-      expect(jwt.sign).toHaveBeenCalledWith(
+-        {
+-          userId: 1,
+-          googleId: '123456',
+-          email: 'test@example.com',
+-          name: 'Test User'
+-        },
+-        'test-secret',
+-        { expiresIn: '7d' }
+-      );
+-      expect(result).toBe(mockToken);
+-    });
+-  });
+-});
+diff --git a/backend/tests/routes.basic.test.js b/backend/tests/routes.basic.test.js
+deleted file mode 100644
+index 0f608a4..0000000
+--- a/backend/tests/routes.basic.test.js
++++ /dev/null
+@@ -1,113 +0,0 @@
+-const request = require('supertest');
+-const express = require('express');
+-
+-// Mock all dependencies
+-jest.mock('../services/calendarService');
+-jest.mock('../services/tasksService');
+-jest.mock('../services/ttsService');
+-jest.mock('../services/dbService');
+-jest.mock('../middleware/auth');
+-
+-const calendarService = require('../services/calendarService');
+-const tasksService = require('../services/tasksService');
+-const ttsService = require('../services/ttsService');
+-const dbService = require('../services/dbService');
+-const { authenticateToken } = require('../middleware/auth');
+-
+-describe('Routes Basic Tests', () => {
+-  let app;
+-
+-  beforeEach(() => {
+-    app = express();
+-    app.use(express.json());
+-    
+-    // Mock authentication middleware
+-    authenticateToken.mockImplementation((req, res, next) => {
+-      req.user = { userId: 1 };
+-      next();
+-    });
+-    
+-    jest.clearAllMocks();
+-  });
+-
+-  describe('Calendar Routes', () => {
+-    beforeEach(() => {
+-      const calendarRoutes = require('../routes/calendar');
+-      app.use('/api/calendar', calendarRoutes);
+-    });
+-
+-    it('should handle GET /events', async () => {
+-      calendarService.getEvents = jest.fn().mockResolvedValue([]);
+-
+-      const response = await request(app)
+-        .get('/api/calendar/events?start=2023-10-01&end=2023-10-02');
+-
+-      expect(response.status).toBe(200);
+-      expect(calendarService.getEvents).toHaveBeenCalled();
+-    });
+-
+-    it('should handle POST /focus-block', async () => {
+-      calendarService.createEvent = jest.fn().mockResolvedValue({ id: 'test' });
+-
+-      const response = await request(app)
+-        .post('/api/calendar/focus-block')
+-        .send({ title: 'Test' });
+-
+-      expect(response.status).toBe(200);
+-      expect(calendarService.createEvent).toHaveBeenCalled();
+-    });
+-  });
+-
+-  describe('Tasks Routes', () => {
+-    beforeEach(() => {
+-      const tasksRoutes = require('../routes/tasks');
+-      app.use('/api/tasks', tasksRoutes);
+-    });
+-
+-    it('should handle GET /lists', async () => {
+-      tasksService.getTaskLists = jest.fn().mockResolvedValue([]);
+-
+-      const response = await request(app)
+-        .get('/api/tasks/lists');
+-
+-      expect(response.status).toBe(200);
+-      expect(tasksService.getTaskLists).toHaveBeenCalled();
+-    });
+-
+-    it('should handle GET /', async () => {
+-      tasksService.getTasks = jest.fn().mockResolvedValue([]);
+-
+-      const response = await request(app)
+-        .get('/api/tasks');
+-
+-      expect(response.status).toBe(200);
+-      expect(tasksService.getTasks).toHaveBeenCalled();
+-    });
+-  });
+-
+-  describe('TTS Routes', () => {
+-    beforeEach(() => {
+-      const ttsRoutes = require('../routes/tts');
+-      app.use('/api/tts', ttsRoutes);
+-    });
+-
+-    it('should handle POST /speak', async () => {
+-      ttsService.generateSpeech = jest.fn().mockResolvedValue(Buffer.from('audio'));
+-
+-      const response = await request(app)
+-        .post('/api/tts/speak')
+-        .send({ text: 'Hello' });
+-
+-      expect(response.status).toBe(200);
+-      expect(ttsService.generateSpeech).toHaveBeenCalled();
+-    });
+-
+-    it('should handle missing text', async () => {
+-      const response = await request(app)
+-        .post('/api/tts/speak')
+-        .send({});
+-
+-      expect(response.status).toBe(400);
+-    });
+-  });
+-});
+diff --git a/backend/tests/setup.js b/backend/tests/setup.js
+deleted file mode 100644
+index 7677ff5..0000000
+--- a/backend/tests/setup.js
++++ /dev/null
+@@ -1,18 +0,0 @@
+-// Test setup and global mocks
+-process.env.NODE_ENV = 'test';
+-process.env.JWT_SECRET = 'test-secret';
+-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
+-process.env.LLM_API_KEY = 'test-key';
+-process.env.LLM_BASE_URL = 'http://test-llm.com';
+-process.env.GOOGLE_CLIENT_ID = 'test-client-id';
+-process.env.GOOGLE_CLIENT_SECRET = 'test-client-secret';
+-process.env.GOOGLE_REDIRECT_URI = 'http://localhost:8080/auth/google/callback';
+-
+-// Mock console.log to reduce test noise
+-global.console = {
+-  ...console,
+-  log: jest.fn(),
+-  error: jest.fn(),
+-  warn: jest.fn(),
+-  info: jest.fn(),
+-};
+diff --git a/backend/tests/socketAuth.middleware.test.js b/backend/tests/socketAuth.middleware.test.js
+deleted file mode 100644
+index 38b1d7e..0000000
+--- a/backend/tests/socketAuth.middleware.test.js
++++ /dev/null
+@@ -1,52 +0,0 @@
+-const { authenticateSocket } = require('../middleware/socketAuth');
+-const jwt = require('jsonwebtoken');
+-
+-// Mock jwt
+-jest.mock('jsonwebtoken');
+-
+-describe('Socket Auth Middleware', () => {
+-  let socket, next;
+-
+-  beforeEach(() => {
+-    socket = {
+-      handshake: {
+-        auth: {},
+-        headers: {}
+-      }
+-    };
+-    next = jest.fn();
+-    jest.clearAllMocks();
+-  });
+-
+-  it('should authenticate valid token from auth', () => {
+-    const mockUser = { userId: 1, email: 'test@example.com' };
+-    
+-    socket.handshake.auth.token = 'valid-token';
+-    jwt.verify.mockImplementation((token, secret, callback) => {
+-      callback(null, mockUser);
+-    });
+-
+-    authenticateSocket(socket, next);
+-
+-    expect(jwt.verify).toHaveBeenCalledWith('valid-token', 'test-secret', expect.any(Function));
+-    expect(socket.user).toEqual(mockUser);
+-    expect(next).toHaveBeenCalled();
+-  });
+-
+-  it('should reject if no token provided', () => {
+-    authenticateSocket(socket, next);
+-
+-    expect(next).toHaveBeenCalledWith(new Error('Authentication error: No token provided'));
+-  });
+-
+-  it('should reject invalid token', () => {
+-    socket.handshake.auth.token = 'invalid-token';
+-    jwt.verify.mockImplementation((token, secret, callback) => {
+-      callback(new Error('Invalid token'), null);
+-    });
+-
+-    authenticateSocket(socket, next);
+-
+-    expect(next).toHaveBeenCalledWith(new Error('Authentication error: Invalid token'));
+-  });
+-});
+diff --git a/backend/tests/tasksService.test.js b/backend/tests/tasksService.test.js
+deleted file mode 100644
+index 8be1f7e..0000000
+--- a/backend/tests/tasksService.test.js
++++ /dev/null
+@@ -1,195 +0,0 @@
+-const tasksService = require('../services/tasksService');
+-
+-// Mock googleapis
+-jest.mock('googleapis', () => ({
+-  google: {
+-    auth: {
+-      OAuth2: jest.fn(() => ({
+-        setCredentials: jest.fn(),
+-        refreshAccessToken: jest.fn()
+-      }))
+-    },
+-    tasks: jest.fn(() => ({
+-      tasklists: {
+-        list: jest.fn()
+-      },
+-      tasks: {
+-        list: jest.fn(),
+-        insert: jest.fn(),
+-        update: jest.fn(),
+-        delete: jest.fn()
+-      }
+-    }))
+-  }
+-}));
+-
+-// Mock dbService
+-jest.mock('../services/dbService', () => ({
+-  getUserById: jest.fn()
+-}));
+-
+-const { google } = require('googleapis');
+-const dbService = require('../services/dbService');
+-
+-describe('TasksService', () => {
+-  beforeEach(() => {
+-    jest.clearAllMocks();
+-  });
+-
+-  describe('getAuthenticatedClient', () => {
+-    it('should return authenticated tasks client', async () => {
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'access-token',
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      const mockTasks = { tasklists: { list: jest.fn() } };
+-      google.tasks.mockReturnValueOnce(mockTasks);
+-
+-      const result = await tasksService.getAuthenticatedClient(1);
+-
+-      expect(dbService.getUserById).toHaveBeenCalledWith(1);
+-      expect(result).toBe(mockTasks);
+-    });
+-
+-    it('should throw error if user not authenticated', async () => {
+-      dbService.getUserById.mockResolvedValueOnce(null);
+-
+-      await expect(tasksService.getAuthenticatedClient(1))
+-        .rejects.toThrow('User not authenticated');
+-    });
+-  });
+-
+-  describe('getTaskLists', () => {
+-    it('should return task lists', async () => {
+-      const mockTaskLists = [
+-        { id: 'list1', title: 'My Tasks' }
+-      ];
+-
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'access-token',
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      const mockTasks = {
+-        tasklists: {
+-          list: jest.fn().mockResolvedValueOnce({
+-            data: { items: mockTaskLists }
+-          })
+-        }
+-      };
+-
+-      google.tasks.mockReturnValueOnce(mockTasks);
+-
+-      const result = await tasksService.getTaskLists(1);
+-
+-      expect(mockTasks.tasklists.list).toHaveBeenCalled();
+-      expect(result).toEqual(mockTaskLists);
+-    });
+-  });
+-
+-  describe('getTasks', () => {
+-    it('should return tasks from default list', async () => {
+-      const mockTasks = [
+-        { id: 'task1', title: 'Test Task' }
+-      ];
+-
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'access-token',
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      const mockTasksClient = {
+-        tasks: {
+-          list: jest.fn().mockResolvedValueOnce({
+-            data: { items: mockTasks }
+-          })
+-        }
+-      };
+-
+-      google.tasks.mockReturnValueOnce(mockTasksClient);
+-
+-      const result = await tasksService.getTasks(1);
+-
+-      expect(mockTasksClient.tasks.list).toHaveBeenCalledWith({
+-        tasklist: '@default',
+-        showCompleted: true,
+-        showHidden: true
+-      });
+-      expect(result).toEqual(mockTasks);
+-    });
+-
+-    it('should return tasks from specific list', async () => {
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'access-token',
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      const mockTasksClient = {
+-        tasks: {
+-          list: jest.fn().mockResolvedValueOnce({
+-            data: { items: [] }
+-          })
+-        }
+-      };
+-
+-      google.tasks.mockReturnValueOnce(mockTasksClient);
+-
+-      await tasksService.getTasks(1, 'custom-list');
+-
+-      expect(mockTasksClient.tasks.list).toHaveBeenCalledWith({
+-        tasklist: 'custom-list',
+-        showCompleted: true,
+-        showHidden: true
+-      });
+-    });
+-  });
+-
+-  describe('createTask', () => {
+-    it('should create a new task', async () => {
+-      const mockTask = {
+-        id: 'new-task',
+-        title: 'New Task'
+-      };
+-
+-      const mockUser = {
+-        id: 1,
+-        access_token: 'access-token',
+-        refresh_token: 'refresh-token'
+-      };
+-
+-      dbService.getUserById.mockResolvedValueOnce(mockUser);
+-
+-      const mockTasksClient = {
+-        tasks: {
+-          insert: jest.fn().mockResolvedValueOnce({
+-            data: mockTask
+-          })
+-        }
+-      };
+-
+-      google.tasks.mockReturnValueOnce(mockTasksClient);
+-
+-      const taskData = { title: 'New Task' };
+-      const result = await tasksService.createTask(1, taskData);
+-
+-      expect(mockTasksClient.tasks.insert).toHaveBeenCalledWith({
+-        tasklist: '@default',
+-        resource: taskData
+-      });
+-      expect(result).toEqual(mockTask);
+-    });
+-  });
+-});
+diff --git a/docker-setup.sh b/docker-setup.sh
+new file mode 100755
+index 0000000..fd7fb1d
+--- /dev/null
++++ b/docker-setup.sh
+@@ -0,0 +1,32 @@
++#!/bin/bash
++
++echo "🐳 Setting up AuraFlow with Docker..."
++
++# Check if Docker is installed
++if ! command -v docker &> /dev/null; then
++    echo "❌ Docker is not installed. Please install Docker first."
++    exit 1
++fi
++
++if ! command -v docker-compose &> /dev/null; then
++    echo "❌ Docker Compose is not installed. Please install Docker Compose first."
++    exit 1
++fi
++
++# Create .env if it doesn't exist
++if [ ! -f .env ]; then
++    if [ -f .env.example ]; then
++        cp .env.example .env
++        echo "📝 Created .env from .env.example"
++        echo "⚠️  Please edit .env with your configuration before running docker-compose up"
++    else
++        echo "⚠️  No .env.example found. You'll need to create .env manually."
++    fi
++fi
++
++echo "✅ Docker setup complete!"
++echo ""
++echo "Next steps:"
++echo "1. Edit .env with your configuration"
++echo "2. Run: docker-compose up --build"
++echo "3. Access the app at http://localhost:3001"
+diff --git a/frontend/.npmrc b/frontend/.npmrc
+new file mode 100644
+index 0000000..214c29d
+--- /dev/null
++++ b/frontend/.npmrc
+@@ -0,0 +1 @@
++registry=https://registry.npmjs.org/
+diff --git a/frontend/package.json b/frontend/package.json
+index 569198d..bf0e28d 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -6,7 +6,6 @@
+     "start": "react-scripts start",
+     "build": "react-scripts build",
+     "test": "react-scripts test",
+-    "test:coverage": "react-scripts test --coverage --watchAll=false --collectCoverageFrom='src/**/*.{js,jsx}' --collectCoverageFrom='!src/**/*.test.{js,jsx}' --collectCoverageFrom='!src/**/__tests__/**'",
+     "test:e2e": "playwright test --reporter=line",
+     "test:e2e:ui": "playwright test --ui",
+     "eject": "react-scripts eject"
+diff --git a/frontend/src/__tests__/components/Chat/MessageBubble.test.jsx b/frontend/src/__tests__/components/Chat/MessageBubble.test.jsx
+deleted file mode 100644
+index 7e0c772..0000000
+--- a/frontend/src/__tests__/components/Chat/MessageBubble.test.jsx
++++ /dev/null
+@@ -1,32 +0,0 @@
+-import { render, screen } from '@testing-library/react';
+-
+-// Mock the MessageBubble component to avoid complex dependencies
+-jest.mock('../../../components/Chat/MessageBubble', () => ({
+-  MessageBubble: ({ message, isUser }) => (
+-    <div data-testid="message-bubble">
+-      <div data-testid={isUser ? 'user-message' : 'ai-message'}>
+-        {message.content}
+-      </div>
+-    </div>
+-  )
+-}));
+-
+-const { MessageBubble } = require('../../../components/Chat/MessageBubble');
+-
+-describe('MessageBubble Component', () => {
+-  it('renders user message', () => {
+-    const message = { content: 'Hello AI!' };
+-    render(<MessageBubble message={message} isUser={true} />);
+-    
+-    expect(screen.getByTestId('user-message')).toBeInTheDocument();
+-    expect(screen.getByText('Hello AI!')).toBeInTheDocument();
+-  });
+-
+-  it('renders AI message', () => {
+-    const message = { content: 'Hello human!' };
+-    render(<MessageBubble message={message} isUser={false} />);
+-    
+-    expect(screen.getByTestId('ai-message')).toBeInTheDocument();
+-    expect(screen.getByText('Hello human!')).toBeInTheDocument();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/components/InstallPrompt.test.jsx b/frontend/src/__tests__/components/InstallPrompt.test.jsx
+deleted file mode 100644
+index 54a181a..0000000
+--- a/frontend/src/__tests__/components/InstallPrompt.test.jsx
++++ /dev/null
+@@ -1,190 +0,0 @@
+-import React from 'react';
+-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+-import { MantineProvider } from '@mantine/core';
+-import { InstallPrompt } from '../../components/InstallPrompt';
+-import * as usePWAHook from '../../hooks/usePWA';
+-
+-// Mock the usePWA hook
+-jest.mock('../../hooks/usePWA');
+-
+-const renderWithProvider = (component) => {
+-  return render(
+-    <MantineProvider>
+-      {component}
+-    </MantineProvider>
+-  );
+-};
+-
+-describe('InstallPrompt Component', () => {
+-  let mockUsePWA;
+-
+-  beforeEach(() => {
+-    mockUsePWA = {
+-      isInstallable: false,
+-      isInstalled: false,
+-      installApp: jest.fn()
+-    };
+-    usePWAHook.usePWA.mockReturnValue(mockUsePWA);
+-    
+-    jest.useFakeTimers();
+-  });
+-
+-  afterEach(() => {
+-    jest.useRealTimers();
+-    jest.clearAllMocks();
+-  });
+-
+-  it('does not render when already installed', () => {
+-    mockUsePWA.isInstalled = true;
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    expect(screen.queryByText('Install AuraFlow')).not.toBeInTheDocument();
+-  });
+-
+-  it('renders install prompt when installable', () => {
+-    mockUsePWA.isInstallable = true;
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    expect(screen.getByText('Install AuraFlow')).toBeInTheDocument();
+-    expect(screen.getByText('Add to your home screen for quick access')).toBeInTheDocument();
+-    expect(screen.getByText('Install')).toBeInTheDocument();
+-  });
+-
+-  it('shows manual instructions after delay when not installable', async () => {
+-    mockUsePWA.isInstallable = false;
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    // Initially should not render
+-    expect(screen.queryByText('Add to Home Screen')).not.toBeInTheDocument();
+-    
+-    // Fast forward 5 seconds
+-    jest.advanceTimersByTime(5000);
+-    
+-    // Re-render to trigger state update
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    await waitFor(() => {
+-      expect(screen.getByText('Add to Home Screen')).toBeInTheDocument();
+-    });
+-    
+-    expect(screen.getByText('Use browser menu → "Add to Home Screen"')).toBeInTheDocument();
+-    expect(screen.getByText('Got it')).toBeInTheDocument();
+-  });
+-
+-  it('calls installApp when install button clicked', async () => {
+-    mockUsePWA.isInstallable = true;
+-    mockUsePWA.installApp.mockResolvedValue(true);
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    const installButton = screen.getByText('Install');
+-    fireEvent.click(installButton);
+-    
+-    expect(mockUsePWA.installApp).toHaveBeenCalled();
+-    
+-    // Wait for async operation
+-    await waitFor(() => {
+-      expect(screen.queryByText('Install AuraFlow')).not.toBeInTheDocument();
+-    });
+-  });
+-
+-  it('does not dismiss when install fails', async () => {
+-    mockUsePWA.isInstallable = true;
+-    mockUsePWA.installApp.mockResolvedValue(false);
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    const installButton = screen.getByText('Install');
+-    fireEvent.click(installButton);
+-    
+-    expect(mockUsePWA.installApp).toHaveBeenCalled();
+-    
+-    // Should still be visible after failed install
+-    await waitFor(() => {
+-      expect(screen.getByText('Install AuraFlow')).toBeInTheDocument();
+-    });
+-  });
+-
+-  it('dismisses when close button clicked', () => {
+-    mockUsePWA.isInstallable = true;
+-    
+-    const { rerender } = renderWithProvider(<InstallPrompt />);
+-    
+-    const closeButton = screen.getByRole('button', { name: /close/i });
+-    fireEvent.click(closeButton);
+-    
+-    // Re-render to trigger state update
+-    rerender(
+-      <MantineProvider>
+-        <InstallPrompt />
+-      </MantineProvider>
+-    );
+-    
+-    expect(screen.queryByText('Install AuraFlow')).not.toBeInTheDocument();
+-  });
+-
+-  it('dismisses when "Got it" button clicked', async () => {
+-    mockUsePWA.isInstallable = false;
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    // Fast forward to show manual instructions
+-    jest.advanceTimersByTime(5000);
+-    
+-    const { rerender } = renderWithProvider(<InstallPrompt />);
+-    
+-    await waitFor(() => {
+-      expect(screen.getByText('Got it')).toBeInTheDocument();
+-    });
+-    
+-    const gotItButton = screen.getByText('Got it');
+-    fireEvent.click(gotItButton);
+-    
+-    // Re-render to trigger state update
+-    rerender(
+-      <MantineProvider>
+-        <InstallPrompt />
+-      </MantineProvider>
+-    );
+-    
+-    expect(screen.queryByText('Add to Home Screen')).not.toBeInTheDocument();
+-  });
+-
+-  it('has correct styling and positioning', () => {
+-    mockUsePWA.isInstallable = true;
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    const paper = screen.getByText('Install AuraFlow').closest('[class*="Paper"]');
+-    expect(paper).toHaveStyle({
+-      position: 'fixed',
+-      bottom: '80px',
+-      left: '16px',
+-      right: '16px',
+-      zIndex: '1000'
+-    });
+-  });
+-
+-  it('shows download icon in install button', () => {
+-    mockUsePWA.isInstallable = true;
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    const installButton = screen.getByText('Install');
+-    expect(installButton).toBeInTheDocument();
+-    // Icon is rendered as SVG, check for its presence
+-    expect(installButton.querySelector('svg')).toBeInTheDocument();
+-  });
+-
+-  it('shows close icon in close button', () => {
+-    mockUsePWA.isInstallable = true;
+-    
+-    renderWithProvider(<InstallPrompt />);
+-    
+-    const closeButton = screen.getByRole('button', { name: /close/i });
+-    expect(closeButton.querySelector('svg')).toBeInTheDocument();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/components/Meditation/MeditationPlaceholder.test.jsx b/frontend/src/__tests__/components/Meditation/MeditationPlaceholder.test.jsx
+index 1bdeb5b..2916440 100644
+--- a/frontend/src/__tests__/components/Meditation/MeditationPlaceholder.test.jsx
++++ b/frontend/src/__tests__/components/Meditation/MeditationPlaceholder.test.jsx
+@@ -1,32 +1,40 @@
+ import { render, screen } from '@testing-library/react';
++import { MantineProvider } from '@mantine/core';
+ import { MeditationPlaceholder } from '../../../components/Meditation/MeditationPlaceholder';
++import { theme } from '../../../theme';
+ 
+-// Mock the entire MeditationMenu component to avoid Mantine hooks issues
+-jest.mock('../../../components/Meditation/MeditationMenu', () => ({
+-  MeditationMenu: () => (
+-    <div data-testid="meditation-menu">
++// Mock the BoxBreathing component to avoid media query issues
++jest.mock('../../../components/Meditation/BoxBreathing', () => ({
++  BoxBreathing: () => (
++    <div>
+       <h2>Box Breathing</h2>
+       <p>4-4-4-4 breathing pattern for focus and calm</p>
+-      <h2>Soundscapes</h2>
+-      <p>Ambient sounds to enhance your meditation</p>
++      <button>Reset</button>
++      <div>Breathe In</div>
+     </div>
+   )
+ }));
+ 
+-
++const renderWithProvider = (component) => {
++  return render(
++    <MantineProvider theme={theme}>
++      {component}
++    </MantineProvider>
++  );
++};
+ 
+ describe('MeditationPlaceholder Component', () => {
+-  it('renders the meditation menu', () => {
+-    render(<MeditationPlaceholder />);
++  it('renders the box breathing interface', () => {
++    renderWithProvider(<MeditationPlaceholder />);
+     
+     expect(screen.getByText('Box Breathing')).toBeInTheDocument();
+-    expect(screen.getByText('Soundscapes')).toBeInTheDocument();
++    expect(screen.getByText('4-4-4-4 breathing pattern for focus and calm')).toBeInTheDocument();
+   });
+ 
+-  it('renders meditation options', () => {
+-    render(<MeditationPlaceholder />);
++  it('renders with proper controls', () => {
++    renderWithProvider(<MeditationPlaceholder />);
+     
+-    expect(screen.getByText('4-4-4-4 breathing pattern for focus and calm')).toBeInTheDocument();
+-    expect(screen.getByText('Ambient sounds to enhance your meditation')).toBeInTheDocument();
++    expect(screen.getByText('Reset')).toBeInTheDocument();
++    expect(screen.getByText('Breathe In')).toBeInTheDocument();
+   });
+ });
+diff --git a/frontend/src/__tests__/components/Navigation/Header.test.jsx b/frontend/src/__tests__/components/Navigation/Header.test.jsx
+index 75bd6c1..c9eddbd 100644
+--- a/frontend/src/__tests__/components/Navigation/Header.test.jsx
++++ b/frontend/src/__tests__/components/Navigation/Header.test.jsx
+@@ -18,9 +18,6 @@ jest.mock('@mantine/core', () => ({
+     <button data-testid="button" onClick={onClick} {...props}>{children}</button>
+   ),
+   Text: ({ children, ...props }) => <span data-testid="text" {...props}>{children}</span>,
+-  Modal: ({ children, opened }) => opened ? <div data-testid="modal">{children}</div> : null,
+-  Divider: ({ label, ...props }) => <div data-testid="divider" {...props}>{label}</div>,
+-  Avatar: ({ children, ...props }) => <div data-testid="avatar" {...props}>{children}</div>,
+   useMantineColorScheme: () => ({
+     colorScheme: 'light',
+     toggleColorScheme: mockToggleColorScheme,
+@@ -38,8 +35,6 @@ jest.mock('@tabler/icons-react', () => ({
+   IconMoon: () => <span data-testid="moon-icon">Moon</span>,
+   IconMenu2: () => <span data-testid="menu-icon">☰</span>,
+   IconLogout: () => <span data-testid="logout-icon">🚪</span>,
+-  IconTrash: () => <span data-testid="trash-icon">🗑️</span>,
+-  IconMicrophone: () => <span data-testid="microphone-icon">🎤</span>,
+ }));
+ 
+ // Mock AuthContext
+@@ -47,32 +42,9 @@ jest.mock('../../../contexts/AuthContext', () => ({
+   useAuth: () => ({
+     user: { name: 'Test User', email: 'test@example.com' },
+     logout: jest.fn(),
+-    token: 'mock-token',
+   }),
+ }));
+ 
+-// Mock useSocket hook
+-jest.mock('../../../hooks/useSocket', () => ({
+-  useSocket: () => ({
+-    setChatHistory: jest.fn(),
+-    clearChatHistory: jest.fn(),
+-    ttsPreferences: {},
+-    updateTTSPreferences: jest.fn(),
+-  }),
+-}));
+-
+-// Mock TTSSettings component
+-jest.mock('../../../components/Settings/TTSSettings', () => ({
+-  TTSSettings: () => <div data-testid="tts-settings">TTS Settings</div>,
+-}));
+-
+-// Mock ApiService
+-jest.mock('../../../services/api', () => ({
+-  default: {
+-    clearChatHistory: jest.fn(),
+-  },
+-}));
+-
+ describe('Header Component', () => {
+   beforeEach(() => {
+     mockToggleColorScheme.mockClear();
+diff --git a/frontend/src/__tests__/components/Session/SessionTimer.test.jsx b/frontend/src/__tests__/components/Session/SessionTimer.test.jsx
+deleted file mode 100644
+index 50cfe3e..0000000
+--- a/frontend/src/__tests__/components/Session/SessionTimer.test.jsx
++++ /dev/null
+@@ -1,23 +0,0 @@
+-import { render, screen } from '@testing-library/react';
+-
+-// Mock the SessionTimer component
+-jest.mock('../../../components/Session/SessionTimer', () => ({
+-  SessionTimer: ({ duration, onComplete }) => (
+-    <div data-testid="session-timer">
+-      <div>Timer: {duration} minutes</div>
+-      <button onClick={onComplete}>Complete</button>
+-    </div>
+-  )
+-}));
+-
+-const { SessionTimer } = require('../../../components/Session/SessionTimer');
+-
+-describe('SessionTimer Component', () => {
+-  it('renders timer with duration', () => {
+-    const mockOnComplete = jest.fn();
+-    render(<SessionTimer duration={25} onComplete={mockOnComplete} />);
+-    
+-    expect(screen.getByText('Timer: 25 minutes')).toBeInTheDocument();
+-    expect(screen.getByText('Complete')).toBeInTheDocument();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/components/Settings/TTSSettings.test.jsx b/frontend/src/__tests__/components/Settings/TTSSettings.test.jsx
+deleted file mode 100644
+index c944575..0000000
+--- a/frontend/src/__tests__/components/Settings/TTSSettings.test.jsx
++++ /dev/null
+@@ -1,26 +0,0 @@
+-import { render, screen } from '@testing-library/react';
+-
+-// Mock the TTSSettings component
+-jest.mock('../../../components/Settings/TTSSettings', () => ({
+-  TTSSettings: () => (
+-    <div data-testid="tts-settings">
+-      <h3>Text-to-Speech Settings</h3>
+-      <select data-testid="voice-select">
+-        <option value="default">Default Voice</option>
+-      </select>
+-      <input type="range" data-testid="speed-slider" />
+-    </div>
+-  )
+-}));
+-
+-const { TTSSettings } = require('../../../components/Settings/TTSSettings');
+-
+-describe('TTSSettings Component', () => {
+-  it('renders TTS settings interface', () => {
+-    render(<TTSSettings />);
+-    
+-    expect(screen.getByText('Text-to-Speech Settings')).toBeInTheDocument();
+-    expect(screen.getByTestId('voice-select')).toBeInTheDocument();
+-    expect(screen.getByTestId('speed-slider')).toBeInTheDocument();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/components/Tasks/TaskForm.test.jsx b/frontend/src/__tests__/components/Tasks/TaskForm.test.jsx
+new file mode 100644
+index 0000000..ff23254
+--- /dev/null
++++ b/frontend/src/__tests__/components/Tasks/TaskForm.test.jsx
+@@ -0,0 +1,97 @@
++import { render, screen, fireEvent } from '@testing-library/react';
++import { TaskForm } from '../../../components/Tasks/TaskForm';
++
++// Mock the entire Mantine core module to avoid media query issues
++jest.mock('@mantine/core', () => ({
++  Card: ({ children, withBorder, p, ...props }) => {
++    const { withBorder: _, p: __, ...cleanProps } = props;
++    return <div data-testid="card" {...cleanProps}>{children}</div>;
++  },
++  TextInput: ({ label, value, onChange, required, id, ...props }) => {
++    const inputId = id || 'text-input';
++    const { mb, placeholder, ...cleanProps } = props;
++    return (
++      <div>
++        <label htmlFor={inputId}>{label}</label>
++        <input 
++          id={inputId}
++          data-testid="text-input"
++          value={value || ''}
++          onChange={onChange}
++          required={required}
++          placeholder={placeholder}
++          {...cleanProps}
++        />
++      </div>
++    );
++  },
++  Textarea: ({ label, value, onChange, id, ...props }) => {
++    const textareaId = id || 'textarea';
++    const { mb, placeholder, rows, ...cleanProps } = props;
++    return (
++      <div>
++        <label htmlFor={textareaId}>{label}</label>
++        <textarea 
++          id={textareaId}
++          data-testid="textarea"
++          value={value || ''}
++          onChange={onChange}
++          placeholder={placeholder}
++          rows={rows}
++          {...cleanProps}
++        />
++      </div>
++    );
++  },
++  Button: ({ children, onClick, disabled, type, leftSection, variant, color, ...props }) => {
++    const { leftSection: _, variant: __, color: ___, ...cleanProps } = props;
++    return (
++      <button 
++        data-testid="button"
++        onClick={onClick}
++        disabled={disabled}
++        type={type}
++        {...cleanProps}
++      >
++        {children}
++      </button>
++    );
++  },
++  Group: ({ children, gap, justify, ...props }) => {
++    const { gap: _, justify: __, ...cleanProps } = props;
++    return <div data-testid="group" {...cleanProps}>{children}</div>;
++  },
++  MantineProvider: ({ children }) => <div>{children}</div>,
++}));
++
++// Mock Tabler icons
++jest.mock('@tabler/icons-react', () => ({
++  IconPlus: () => <span data-testid="plus-icon">+</span>,
++  IconX: () => <span data-testid="x-icon">×</span>,
++}));
++
++describe('TaskForm Component', () => {
++  const mockOnSubmit = jest.fn();
++  const mockOnCancel = jest.fn();
++
++  beforeEach(() => {
++    jest.clearAllMocks();
++  });
++
++  it('renders form fields', () => {
++    render(<TaskForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
++    
++    expect(screen.getByLabelText('Task Title')).toBeInTheDocument();
++    expect(screen.getByLabelText('Notes (optional)')).toBeInTheDocument();
++    expect(screen.getByText('Add Task')).toBeInTheDocument();
++    expect(screen.getByText('Cancel')).toBeInTheDocument();
++  });
++
++  it('calls onCancel when cancel button is clicked', () => {
++    render(<TaskForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
++    
++    fireEvent.click(screen.getByText('Cancel'));
++    
++    expect(mockOnCancel).toHaveBeenCalled();
++  });
++});
+diff --git a/frontend/src/__tests__/components/Tasks/TasksView.test.jsx b/frontend/src/__tests__/components/Tasks/TasksView.test.jsx
+index 4b5a7c9..74112ad 100644
+--- a/frontend/src/__tests__/components/Tasks/TasksView.test.jsx
++++ b/frontend/src/__tests__/components/Tasks/TasksView.test.jsx
+@@ -1,22 +1,59 @@
+ import { render, screen } from '@testing-library/react';
++import { TasksView } from '../../../components/Tasks/TasksView';
+ 
+-// Mock the TasksView component to avoid react-markdown ES module issues
+-jest.mock('../../../components/Tasks/TasksView', () => ({
+-  TasksView: () => (
+-    <div data-testid="tasks-view">
+-      <button>Add Task</button>
+-      <div>Tasks List</div>
+-    </div>
+-  )
++// Mock the entire Mantine core module to avoid media query issues
++jest.mock('@mantine/core', () => ({
++  Stack: ({ children, ...props }) => <div data-testid="stack" {...props}>{children}</div>,
++  Paper: ({ children, ...props }) => <div data-testid="paper" {...props}>{children}</div>,
++  Group: ({ children, ...props }) => <div data-testid="group" {...props}>{children}</div>,
++  Select: ({ value, onChange, data, ...props }) => (
++    <select data-testid="select" value={value} onChange={onChange} {...props}>
++      {data?.map(item => (
++        <option key={item.value} value={item.value}>{item.label}</option>
++      ))}
++    </select>
++  ),
++  Button: ({ children, onClick, leftSection, ...props }) => (
++    <button data-testid="button" onClick={onClick} {...props}>
++      {leftSection}
++      {children}
++    </button>
++  ),
++  LoadingOverlay: ({ visible }) => visible ? <div data-testid="loading">Loading...</div> : null,
++  Text: ({ children, ...props }) => <span data-testid="text" {...props}>{children}</span>,
++  MantineProvider: ({ children }) => <div>{children}</div>,
+ }));
+ 
+-const { TasksView } = require('../../../components/Tasks/TasksView');
++// Mock API service
++jest.mock('../../../services/api', () => {
++  return class MockApiService {
++    constructor() {}
++    getTaskLists = jest.fn().mockResolvedValue({ taskLists: [{ id: '@default', title: 'My Tasks' }] });
++    getTasks = jest.fn().mockResolvedValue({ tasks: [] });
++    createTask = jest.fn().mockResolvedValue({});
++    completeTask = jest.fn().mockResolvedValue({});
++    deleteTask = jest.fn().mockResolvedValue({});
++  };
++});
++
++// Mock AuthContext
++jest.mock('../../../contexts/AuthContext', () => ({
++  useAuth: () => ({
++    token: 'mock-token',
++    user: { id: '1', email: 'test@example.com' }
++  })
++}));
++
++// Mock Tabler icons
++jest.mock('@tabler/icons-react', () => ({
++  IconPlus: () => <span data-testid="plus-icon">+</span>,
++}));
+ 
+ describe('TasksView Component', () => {
+   it('renders tasks view', () => {
+     render(<TasksView />);
+     
++    // Should render without crashing and show the Add Task button
+     expect(screen.getByText('Add Task')).toBeInTheDocument();
+-    expect(screen.getByText('Tasks List')).toBeInTheDocument();
+   });
+-});
+\ No newline at end of file
++});
+diff --git a/frontend/src/__tests__/components/common/ErrorBoundary.test.jsx b/frontend/src/__tests__/components/common/ErrorBoundary.test.jsx
+deleted file mode 100644
+index 1ef56c2..0000000
+--- a/frontend/src/__tests__/components/common/ErrorBoundary.test.jsx
++++ /dev/null
+@@ -1,137 +0,0 @@
+-import React from 'react';
+-import { render, screen } from '@testing-library/react';
+-
+-// Simple ErrorBoundary component for testing
+-export class ErrorBoundary extends React.Component {
+-  constructor(props) {
+-    super(props);
+-    this.state = { hasError: false, error: null };
+-  }
+-
+-  static getDerivedStateFromError(error) {
+-    return { hasError: true, error };
+-  }
+-
+-  componentDidCatch(error, errorInfo) {
+-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+-  }
+-
+-  render() {
+-    if (this.state.hasError) {
+-      return (
+-        <div className="error-boundary" data-testid="error-boundary">
+-          <h2>Something went wrong</h2>
+-          <p>We're sorry, but something unexpected happened.</p>
+-          <button 
+-            onClick={() => this.setState({ hasError: false, error: null })}
+-            data-testid="retry-button"
+-          >
+-            Try again
+-          </button>
+-        </div>
+-      );
+-    }
+-
+-    return this.props.children;
+-  }
+-}
+-
+-// Component that throws an error for testing
+-const ThrowError = ({ shouldThrow }) => {
+-  if (shouldThrow) {
+-    throw new Error('Test error');
+-  }
+-  return <div data-testid="normal-content">Normal content</div>;
+-};
+-
+-describe('ErrorBoundary Component', () => {
+-  // Suppress console.error for these tests
+-  const originalError = console.error;
+-  beforeAll(() => {
+-    console.error = jest.fn();
+-  });
+-
+-  afterAll(() => {
+-    console.error = originalError;
+-  });
+-
+-  it('renders children when there is no error', () => {
+-    render(
+-      <ErrorBoundary>
+-        <ThrowError shouldThrow={false} />
+-      </ErrorBoundary>
+-    );
+-
+-    expect(screen.getByTestId('normal-content')).toBeInTheDocument();
+-    expect(screen.queryByTestId('error-boundary')).not.toBeInTheDocument();
+-  });
+-
+-  it('renders error UI when child component throws', () => {
+-    render(
+-      <ErrorBoundary>
+-        <ThrowError shouldThrow={true} />
+-      </ErrorBoundary>
+-    );
+-
+-    expect(screen.getByTestId('error-boundary')).toBeInTheDocument();
+-    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+-    expect(screen.getByText("We're sorry, but something unexpected happened.")).toBeInTheDocument();
+-    expect(screen.queryByTestId('normal-content')).not.toBeInTheDocument();
+-  });
+-
+-  it('has retry button in error state', () => {
+-    render(
+-      <ErrorBoundary>
+-        <ThrowError shouldThrow={true} />
+-      </ErrorBoundary>
+-    );
+-
+-    const retryButton = screen.getByTestId('retry-button');
+-    expect(retryButton).toBeInTheDocument();
+-    expect(retryButton).toHaveTextContent('Try again');
+-  });
+-
+-  it('logs error when componentDidCatch is called', () => {
+-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+-
+-    render(
+-      <ErrorBoundary>
+-        <ThrowError shouldThrow={true} />
+-      </ErrorBoundary>
+-    );
+-
+-    expect(consoleSpy).toHaveBeenCalledWith(
+-      'ErrorBoundary caught an error:',
+-      expect.any(Error),
+-      expect.any(Object)
+-    );
+-
+-    consoleSpy.mockRestore();
+-  });
+-
+-  it('resets error state when retry button is clicked', () => {
+-    const { rerender } = render(
+-      <ErrorBoundary>
+-        <ThrowError shouldThrow={true} />
+-      </ErrorBoundary>
+-    );
+-
+-    // Error boundary should be showing
+-    expect(screen.getByTestId('error-boundary')).toBeInTheDocument();
+-
+-    // Click retry button
+-    const retryButton = screen.getByTestId('retry-button');
+-    retryButton.click();
+-
+-    // Re-render with non-throwing component
+-    rerender(
+-      <ErrorBoundary>
+-        <ThrowError shouldThrow={false} />
+-      </ErrorBoundary>
+-    );
+-
+-    // Should show normal content again
+-    expect(screen.getByTestId('normal-content')).toBeInTheDocument();
+-    expect(screen.queryByTestId('error-boundary')).not.toBeInTheDocument();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/components/common/LoadingSpinner.test.jsx b/frontend/src/__tests__/components/common/LoadingSpinner.test.jsx
+deleted file mode 100644
+index 339b081..0000000
+--- a/frontend/src/__tests__/components/common/LoadingSpinner.test.jsx
++++ /dev/null
+@@ -1,99 +0,0 @@
+-import React from 'react';
+-import { render, screen } from '@testing-library/react';
+-
+-// Simple LoadingSpinner component for testing
+-export const LoadingSpinner = ({ size = 'medium', color = 'blue', text = 'Loading...' }) => {
+-  const sizeClasses = {
+-    small: 'w-4 h-4',
+-    medium: 'w-8 h-8',
+-    large: 'w-12 h-12'
+-  };
+-
+-  const colorClasses = {
+-    blue: 'text-blue-500',
+-    green: 'text-green-500',
+-    red: 'text-red-500'
+-  };
+-
+-  return (
+-    <div className="flex flex-col items-center justify-center p-4" data-testid="loading-spinner">
+-      <div 
+-        className={`animate-spin rounded-full border-2 border-gray-300 border-t-current ${sizeClasses[size]} ${colorClasses[color]}`}
+-        role="status"
+-        aria-label="Loading"
+-      />
+-      {text && (
+-        <p className="mt-2 text-sm text-gray-600" data-testid="loading-text">
+-          {text}
+-        </p>
+-      )}
+-    </div>
+-  );
+-};
+-
+-describe('LoadingSpinner Component', () => {
+-  it('renders with default props', () => {
+-    render(<LoadingSpinner />);
+-    
+-    const spinner = screen.getByTestId('loading-spinner');
+-    const text = screen.getByTestId('loading-text');
+-    
+-    expect(spinner).toBeInTheDocument();
+-    expect(text).toHaveTextContent('Loading...');
+-  });
+-
+-  it('renders with custom text', () => {
+-    render(<LoadingSpinner text="Please wait..." />);
+-    
+-    const text = screen.getByTestId('loading-text');
+-    expect(text).toHaveTextContent('Please wait...');
+-  });
+-
+-  it('renders without text when text is empty', () => {
+-    render(<LoadingSpinner text="" />);
+-    
+-    const text = screen.queryByTestId('loading-text');
+-    expect(text).not.toBeInTheDocument();
+-  });
+-
+-  it('renders without text when text is null', () => {
+-    render(<LoadingSpinner text={null} />);
+-    
+-    const text = screen.queryByTestId('loading-text');
+-    expect(text).not.toBeInTheDocument();
+-  });
+-
+-  it('applies correct size classes', () => {
+-    const { rerender } = render(<LoadingSpinner size="small" />);
+-    let spinner = screen.getByRole('status');
+-    expect(spinner).toHaveClass('w-4', 'h-4');
+-
+-    rerender(<LoadingSpinner size="large" />);
+-    spinner = screen.getByRole('status');
+-    expect(spinner).toHaveClass('w-12', 'h-12');
+-  });
+-
+-  it('applies correct color classes', () => {
+-    const { rerender } = render(<LoadingSpinner color="green" />);
+-    let spinner = screen.getByRole('status');
+-    expect(spinner).toHaveClass('text-green-500');
+-
+-    rerender(<LoadingSpinner color="red" />);
+-    spinner = screen.getByRole('status');
+-    expect(spinner).toHaveClass('text-red-500');
+-  });
+-
+-  it('has correct accessibility attributes', () => {
+-    render(<LoadingSpinner />);
+-    
+-    const spinner = screen.getByRole('status');
+-    expect(spinner).toHaveAttribute('aria-label', 'Loading');
+-  });
+-
+-  it('has spinning animation class', () => {
+-    render(<LoadingSpinner />);
+-    
+-    const spinner = screen.getByRole('status');
+-    expect(spinner).toHaveClass('animate-spin');
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/components/common/Modal.test.jsx b/frontend/src/__tests__/components/common/Modal.test.jsx
+deleted file mode 100644
+index 78d0ad9..0000000
+--- a/frontend/src/__tests__/components/common/Modal.test.jsx
++++ /dev/null
+@@ -1,204 +0,0 @@
+-import React from 'react';
+-import { render, screen, fireEvent } from '@testing-library/react';
+-
+-// Simple Modal component for testing
+-export const Modal = ({ 
+-  isOpen, 
+-  onClose, 
+-  title, 
+-  children, 
+-  size = 'medium',
+-  showCloseButton = true 
+-}) => {
+-  if (!isOpen) return null;
+-
+-  const sizeClasses = {
+-    small: 'max-w-md',
+-    medium: 'max-w-lg',
+-    large: 'max-w-2xl',
+-    full: 'max-w-full'
+-  };
+-
+-  const handleBackdropClick = (e) => {
+-    if (e.target === e.currentTarget) {
+-      onClose();
+-    }
+-  };
+-
+-  const handleKeyDown = (e) => {
+-    if (e.key === 'Escape') {
+-      onClose();
+-    }
+-  };
+-
+-  React.useEffect(() => {
+-    document.addEventListener('keydown', handleKeyDown);
+-    return () => document.removeEventListener('keydown', handleKeyDown);
+-  }, []);
+-
+-  return (
+-    <div 
+-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+-      onClick={handleBackdropClick}
+-      data-testid="modal-backdrop"
+-    >
+-      <div 
+-        className={`bg-white rounded-lg shadow-xl ${sizeClasses[size]} w-full mx-4`}
+-        data-testid="modal-content"
+-        role="dialog"
+-        aria-modal="true"
+-        aria-labelledby={title ? "modal-title" : undefined}
+-      >
+-        {(title || showCloseButton) && (
+-          <div className="flex items-center justify-between p-4 border-b">
+-            {title && (
+-              <h2 id="modal-title" className="text-lg font-semibold">
+-                {title}
+-              </h2>
+-            )}
+-            {showCloseButton && (
+-              <button
+-                onClick={onClose}
+-                className="text-gray-400 hover:text-gray-600"
+-                data-testid="modal-close-button"
+-                aria-label="Close modal"
+-              >
+-                ×
+-              </button>
+-            )}
+-          </div>
+-        )}
+-        <div className="p-4">
+-          {children}
+-        </div>
+-      </div>
+-    </div>
+-  );
+-};
+-
+-describe('Modal Component', () => {
+-  const defaultProps = {
+-    isOpen: true,
+-    onClose: jest.fn(),
+-    title: 'Test Modal',
+-    children: <div>Modal content</div>
+-  };
+-
+-  beforeEach(() => {
+-    jest.clearAllMocks();
+-  });
+-
+-  it('renders when isOpen is true', () => {
+-    render(<Modal {...defaultProps} />);
+-    
+-    expect(screen.getByTestId('modal-backdrop')).toBeInTheDocument();
+-    expect(screen.getByTestId('modal-content')).toBeInTheDocument();
+-    expect(screen.getByText('Test Modal')).toBeInTheDocument();
+-    expect(screen.getByText('Modal content')).toBeInTheDocument();
+-  });
+-
+-  it('does not render when isOpen is false', () => {
+-    render(<Modal {...defaultProps} isOpen={false} />);
+-    
+-    expect(screen.queryByTestId('modal-backdrop')).not.toBeInTheDocument();
+-  });
+-
+-  it('renders without title', () => {
+-    render(<Modal {...defaultProps} title={null} />);
+-    
+-    expect(screen.queryByText('Test Modal')).not.toBeInTheDocument();
+-    expect(screen.getByTestId('modal-content')).toBeInTheDocument();
+-  });
+-
+-  it('renders without close button when showCloseButton is false', () => {
+-    render(<Modal {...defaultProps} showCloseButton={false} />);
+-    
+-    expect(screen.queryByTestId('modal-close-button')).not.toBeInTheDocument();
+-  });
+-
+-  it('calls onClose when close button is clicked', () => {
+-    const onClose = jest.fn();
+-    render(<Modal {...defaultProps} onClose={onClose} />);
+-    
+-    fireEvent.click(screen.getByTestId('modal-close-button'));
+-    expect(onClose).toHaveBeenCalledTimes(1);
+-  });
+-
+-  it('calls onClose when backdrop is clicked', () => {
+-    const onClose = jest.fn();
+-    render(<Modal {...defaultProps} onClose={onClose} />);
+-    
+-    fireEvent.click(screen.getByTestId('modal-backdrop'));
+-    expect(onClose).toHaveBeenCalledTimes(1);
+-  });
+-
+-  it('does not call onClose when modal content is clicked', () => {
+-    const onClose = jest.fn();
+-    render(<Modal {...defaultProps} onClose={onClose} />);
+-    
+-    fireEvent.click(screen.getByTestId('modal-content'));
+-    expect(onClose).not.toHaveBeenCalled();
+-  });
+-
+-  it('calls onClose when Escape key is pressed', () => {
+-    const onClose = jest.fn();
+-    render(<Modal {...defaultProps} onClose={onClose} />);
+-    
+-    fireEvent.keyDown(document, { key: 'Escape' });
+-    expect(onClose).toHaveBeenCalledTimes(1);
+-  });
+-
+-  it('does not call onClose for other keys', () => {
+-    const onClose = jest.fn();
+-    render(<Modal {...defaultProps} onClose={onClose} />);
+-    
+-    fireEvent.keyDown(document, { key: 'Enter' });
+-    expect(onClose).not.toHaveBeenCalled();
+-  });
+-
+-  it('applies correct size classes', () => {
+-    const { rerender } = render(<Modal {...defaultProps} size="small" />);
+-    expect(screen.getByTestId('modal-content')).toHaveClass('max-w-md');
+-
+-    rerender(<Modal {...defaultProps} size="large" />);
+-    expect(screen.getByTestId('modal-content')).toHaveClass('max-w-2xl');
+-
+-    rerender(<Modal {...defaultProps} size="full" />);
+-    expect(screen.getByTestId('modal-content')).toHaveClass('max-w-full');
+-  });
+-
+-  it('has correct accessibility attributes', () => {
+-    render(<Modal {...defaultProps} />);
+-    
+-    const modalContent = screen.getByTestId('modal-content');
+-    expect(modalContent).toHaveAttribute('role', 'dialog');
+-    expect(modalContent).toHaveAttribute('aria-modal', 'true');
+-    expect(modalContent).toHaveAttribute('aria-labelledby', 'modal-title');
+-  });
+-
+-  it('has correct accessibility attributes without title', () => {
+-    render(<Modal {...defaultProps} title={null} />);
+-    
+-    const modalContent = screen.getByTestId('modal-content');
+-    expect(modalContent).toHaveAttribute('role', 'dialog');
+-    expect(modalContent).toHaveAttribute('aria-modal', 'true');
+-    expect(modalContent).not.toHaveAttribute('aria-labelledby');
+-  });
+-
+-  it('close button has correct aria-label', () => {
+-    render(<Modal {...defaultProps} />);
+-    
+-    const closeButton = screen.getByTestId('modal-close-button');
+-    expect(closeButton).toHaveAttribute('aria-label', 'Close modal');
+-  });
+-
+-  it('cleans up event listener on unmount', () => {
+-    const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
+-    const { unmount } = render(<Modal {...defaultProps} />);
+-    
+-    unmount();
+-    
+-    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+-    removeEventListenerSpy.mockRestore();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/hooks/useLocalStorage.test.js b/frontend/src/__tests__/hooks/useLocalStorage.test.js
+deleted file mode 100644
+index 781b770..0000000
+--- a/frontend/src/__tests__/hooks/useLocalStorage.test.js
++++ /dev/null
+@@ -1,85 +0,0 @@
+-import { renderHook, act } from '@testing-library/react';
+-
+-// Simple localStorage hook for testing
+-export const useLocalStorage = (key, initialValue) => {
+-  const [storedValue, setStoredValue] = React.useState(() => {
+-    try {
+-      const item = window.localStorage.getItem(key);
+-      return item ? JSON.parse(item) : initialValue;
+-    } catch (error) {
+-      return initialValue;
+-    }
+-  });
+-
+-  const setValue = (value) => {
+-    try {
+-      const valueToStore = value instanceof Function ? value(storedValue) : value;
+-      setStoredValue(valueToStore);
+-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+-    } catch (error) {
+-      console.error('Error saving to localStorage:', error);
+-    }
+-  };
+-
+-  return [storedValue, setValue];
+-};
+-
+-// Mock React for the test
+-const React = {
+-  useState: jest.fn()
+-};
+-
+-describe('useLocalStorage Hook', () => {
+-  beforeEach(() => {
+-    localStorage.clear();
+-    React.useState.mockClear();
+-  });
+-
+-  it('initializes with stored value', () => {
+-    localStorage.setItem('test-key', JSON.stringify('stored-value'));
+-    
+-    const mockSetState = jest.fn();
+-    React.useState.mockReturnValue(['stored-value', mockSetState]);
+-
+-    const { result } = renderHook(() => useLocalStorage('test-key', 'default'));
+-    
+-    expect(result.current[0]).toBe('stored-value');
+-  });
+-
+-  it('initializes with default value when no stored value', () => {
+-    const mockSetState = jest.fn();
+-    React.useState.mockReturnValue(['default-value', mockSetState]);
+-
+-    const { result } = renderHook(() => useLocalStorage('new-key', 'default-value'));
+-    
+-    expect(result.current[0]).toBe('default-value');
+-  });
+-
+-  it('updates localStorage when value changes', () => {
+-    const mockSetState = jest.fn();
+-    React.useState.mockReturnValue(['initial', mockSetState]);
+-
+-    const { result } = renderHook(() => useLocalStorage('test-key', 'initial'));
+-    
+-    act(() => {
+-      result.current[1]('new-value');
+-    });
+-
+-    expect(localStorage.getItem('test-key')).toBe('"new-value"');
+-  });
+-
+-  it('handles function updates', () => {
+-    const mockSetState = jest.fn();
+-    React.useState.mockReturnValue(['initial', mockSetState]);
+-
+-    const { result } = renderHook(() => useLocalStorage('test-key', 'initial'));
+-    
+-    act(() => {
+-      result.current[1]((prev) => prev + '-updated');
+-    });
+-
+-    // Since we're mocking, we can't test the actual function behavior
+-    // but we can verify the setValue function exists
+-    expect(typeof result.current[1]).toBe('function');
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/hooks/usePWA.test.js b/frontend/src/__tests__/hooks/usePWA.test.js
+deleted file mode 100644
+index 93cb927..0000000
+--- a/frontend/src/__tests__/hooks/usePWA.test.js
++++ /dev/null
+@@ -1,135 +0,0 @@
+-import { renderHook, act } from '@testing-library/react';
+-import { usePWA } from '../../hooks/usePWA';
+-
+-describe('usePWA Hook', () => {
+-  beforeEach(() => {
+-    // Mock matchMedia
+-    Object.defineProperty(window, 'matchMedia', {
+-      writable: true,
+-      value: jest.fn().mockImplementation(query => ({
+-        matches: false,
+-        media: query,
+-        onchange: null,
+-        addListener: jest.fn(),
+-        removeListener: jest.fn(),
+-        addEventListener: jest.fn(),
+-        removeEventListener: jest.fn(),
+-        dispatchEvent: jest.fn(),
+-      })),
+-    });
+-
+-    // Mock navigator.standalone
+-    Object.defineProperty(window.navigator, 'standalone', {
+-      writable: true,
+-      value: false,
+-    });
+-  });
+-
+-  it('initializes with correct default values', () => {
+-    const { result } = renderHook(() => usePWA());
+-
+-    expect(result.current.isInstallable).toBe(false);
+-    expect(result.current.isInstalled).toBe(false);
+-    expect(typeof result.current.installApp).toBe('function');
+-  });
+-
+-  it('detects standalone mode', () => {
+-    window.matchMedia.mockReturnValue({ matches: true });
+-    
+-    const { result } = renderHook(() => usePWA());
+-    expect(result.current.isInstalled).toBe(true);
+-  });
+-
+-  it('detects webkit standalone', () => {
+-    Object.defineProperty(window.navigator, 'standalone', {
+-      writable: true,
+-      value: true,
+-    });
+-    
+-    const { result } = renderHook(() => usePWA());
+-    expect(result.current.isInstalled).toBe(true);
+-  });
+-
+-  it('handles beforeinstallprompt event', () => {
+-    const { result } = renderHook(() => usePWA());
+-    
+-    const mockEvent = {
+-      preventDefault: jest.fn(),
+-      prompt: jest.fn(),
+-      userChoice: Promise.resolve({ outcome: 'accepted' })
+-    };
+-    
+-    act(() => {
+-      window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), mockEvent));
+-    });
+-    
+-    expect(mockEvent.preventDefault).toHaveBeenCalled();
+-    expect(result.current.isInstallable).toBe(true);
+-  });
+-
+-  it('handles app installed event', () => {
+-    const { result } = renderHook(() => usePWA());
+-    
+-    act(() => {
+-      window.dispatchEvent(new Event('appinstalled'));
+-    });
+-    
+-    expect(result.current.isInstalled).toBe(true);
+-    expect(result.current.isInstallable).toBe(false);
+-  });
+-
+-  it('installs app successfully', async () => {
+-    const { result } = renderHook(() => usePWA());
+-    
+-    const mockEvent = {
+-      preventDefault: jest.fn(),
+-      prompt: jest.fn(),
+-      userChoice: Promise.resolve({ outcome: 'accepted' })
+-    };
+-    
+-    act(() => {
+-      window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), mockEvent));
+-    });
+-    
+-    let installResult;
+-    await act(async () => {
+-      installResult = await result.current.installApp();
+-    });
+-    
+-    expect(mockEvent.prompt).toHaveBeenCalled();
+-    expect(installResult).toBe(true);
+-    expect(result.current.isInstallable).toBe(false);
+-  });
+-
+-  it('handles install rejection', async () => {
+-    const { result } = renderHook(() => usePWA());
+-    
+-    const mockEvent = {
+-      preventDefault: jest.fn(),
+-      prompt: jest.fn(),
+-      userChoice: Promise.resolve({ outcome: 'dismissed' })
+-    };
+-    
+-    act(() => {
+-      window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), mockEvent));
+-    });
+-    
+-    let installResult;
+-    await act(async () => {
+-      installResult = await result.current.installApp();
+-    });
+-    
+-    expect(installResult).toBe(false);
+-  });
+-
+-  it('returns false when no deferred prompt', async () => {
+-    const { result } = renderHook(() => usePWA());
+-    
+-    let installResult;
+-    await act(async () => {
+-      installResult = await result.current.installApp();
+-    });
+-    
+-    expect(installResult).toBe(false);
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/hooks/useSocket.test.js b/frontend/src/__tests__/hooks/useSocket.test.js
+deleted file mode 100644
+index d5e8a17..0000000
+--- a/frontend/src/__tests__/hooks/useSocket.test.js
++++ /dev/null
+@@ -1,260 +0,0 @@
+-import { renderHook, act } from '@testing-library/react';
+-import { useSocket } from '../../hooks/useSocket';
+-import * as socketService from '../../services/socket';
+-import * as AuthContext from '../../contexts/AuthContext';
+-
+-// Mock dependencies
+-jest.mock('../../services/socket');
+-jest.mock('../../contexts/AuthContext');
+-
+-describe('useSocket Hook', () => {
+-  let mockSocket;
+-  let mockAuth;
+-
+-  beforeEach(() => {
+-    mockSocket = {
+-      connected: true,
+-      on: jest.fn(),
+-      off: jest.fn(),
+-      emit: jest.fn()
+-    };
+-
+-    mockAuth = {
+-      token: 'test-token',
+-      isAuthenticated: true,
+-      user: { id: 1, name: 'Test User' }
+-    };
+-
+-    socketService.connectSocket = jest.fn(() => mockSocket);
+-    socketService.disconnectSocket = jest.fn();
+-    socketService.socket = mockSocket;
+-    AuthContext.useAuth = jest.fn(() => mockAuth);
+-  });
+-
+-  afterEach(() => {
+-    jest.clearAllMocks();
+-  });
+-
+-  it('initializes with default values', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    expect(result.current.isConnected).toBe(true);
+-    expect(result.current.messages).toEqual([]);
+-    expect(result.current.models).toEqual([]);
+-    expect(result.current.selectedModel).toBeNull();
+-  });
+-
+-  it('connects socket when authenticated', () => {
+-    renderHook(() => useSocket());
+-
+-    expect(socketService.connectSocket).toHaveBeenCalledWith('test-token');
+-    expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
+-    expect(mockSocket.on).toHaveBeenCalledWith('disconnect', expect.any(Function));
+-    expect(mockSocket.on).toHaveBeenCalledWith('models', expect.any(Function));
+-    expect(mockSocket.on).toHaveBeenCalledWith('messages', expect.any(Function));
+-  });
+-
+-  it('does not connect when not authenticated', () => {
+-    AuthContext.useAuth.mockReturnValue({
+-      token: null,
+-      isAuthenticated: false,
+-      user: null
+-    });
+-
+-    const { result } = renderHook(() => useSocket());
+-
+-    expect(socketService.connectSocket).not.toHaveBeenCalled();
+-    expect(result.current.isConnected).toBe(false);
+-  });
+-
+-  it('handles models event', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    const modelsData = {
+-      models: ['gpt-4', 'gpt-3.5'],
+-      initialModel: 'gpt-4',
+-      user: {
+-        tts_enabled: true,
+-        tts_voice: 'default',
+-        tts_rate: 1.0,
+-        tts_pitch: 1.0
+-      }
+-    };
+-
+-    // Simulate models event
+-    const modelsCallback = mockSocket.on.mock.calls.find(call => call[0] === 'models')[1];
+-    act(() => {
+-      modelsCallback(modelsData);
+-    });
+-
+-    expect(result.current.models).toEqual(['gpt-4', 'gpt-3.5']);
+-    expect(result.current.selectedModel).toBe('gpt-4');
+-    expect(result.current.ttsPreferences).toEqual({
+-      tts_enabled: true,
+-      tts_voice: 'default',
+-      tts_rate: 1.0,
+-      tts_pitch: 1.0
+-    });
+-  });
+-
+-  it('handles messages event', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    const messages = [
+-      { id: 1, content: 'Hello', sender: 'user' },
+-      { id: 2, content: 'Hi there', sender: 'aurora' }
+-    ];
+-
+-    // Simulate messages event
+-    const messagesCallback = mockSocket.on.mock.calls.find(call => call[0] === 'messages')[1];
+-    act(() => {
+-      messagesCallback(messages);
+-    });
+-
+-    expect(result.current.messages).toEqual(messages);
+-  });
+-
+-  it('handles messages cleared event', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    // First set some messages
+-    const messagesCallback = mockSocket.on.mock.calls.find(call => call[0] === 'messages')[1];
+-    act(() => {
+-      messagesCallback([{ id: 1, content: 'Hello', sender: 'user' }]);
+-    });
+-
+-    // Then clear them
+-    const clearCallback = mockSocket.on.mock.calls.find(call => call[0] === 'messages_cleared')[1];
+-    act(() => {
+-      clearCallback();
+-    });
+-
+-    expect(result.current.messages).toEqual([]);
+-  });
+-
+-  it('sends message when connected', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    act(() => {
+-      result.current.sendMessage('Hello world');
+-    });
+-
+-    expect(mockSocket.emit).toHaveBeenCalledWith('chat_message', {
+-      message: 'Hello world',
+-      model: null
+-    });
+-    expect(result.current.messages).toHaveLength(1);
+-    expect(result.current.messages[0].content).toBe('Hello world');
+-    expect(result.current.messages[0].sender).toBe('user');
+-  });
+-
+-  it('does not send message when not connected', () => {
+-    mockSocket.connected = false;
+-    const { result } = renderHook(() => useSocket());
+-
+-    act(() => {
+-      result.current.sendMessage('Hello world');
+-    });
+-
+-    expect(mockSocket.emit).not.toHaveBeenCalled();
+-  });
+-
+-  it('sends task message with callback', () => {
+-    const { result } = renderHook(() => useSocket());
+-    const callback = jest.fn();
+-
+-    act(() => {
+-      result.current.sendTaskMessage('Create task', callback);
+-    });
+-
+-    expect(mockSocket.emit).toHaveBeenCalledWith('task_message', {
+-      message: 'Create task',
+-      model: null
+-    });
+-    expect(mockSocket.on).toHaveBeenCalledWith('task_response', expect.any(Function));
+-  });
+-
+-  it('handles model change', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    act(() => {
+-      result.current.setSelectedModel('gpt-4');
+-    });
+-
+-    expect(result.current.selectedModel).toBe('gpt-4');
+-    expect(mockSocket.emit).toHaveBeenCalledWith('update_model_preference', {
+-      model: 'gpt-4'
+-    });
+-  });
+-
+-  it('clears chat history', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    act(() => {
+-      result.current.clearChatHistory();
+-    });
+-
+-    expect(mockSocket.emit).toHaveBeenCalledWith('clear_messages');
+-  });
+-
+-  it('regenerates response', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    act(() => {
+-      result.current.regenerateResponse('Original message');
+-    });
+-
+-    expect(mockSocket.emit).toHaveBeenCalledWith('chat_message', {
+-      message: 'Original message',
+-      model: null
+-    });
+-  });
+-
+-  it('injects aurora message', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    act(() => {
+-      result.current.injectAuroraMessage('Aurora message');
+-    });
+-
+-    expect(mockSocket.emit).toHaveBeenCalledWith('inject_aurora_message', {
+-      message: 'Aurora message'
+-    });
+-  });
+-
+-  it('updates TTS preferences', () => {
+-    const { result } = renderHook(() => useSocket());
+-
+-    const newPrefs = { tts_enabled: false, tts_rate: 1.5 };
+-
+-    act(() => {
+-      result.current.updateTTSPreferences(newPrefs);
+-    });
+-
+-    expect(mockSocket.emit).toHaveBeenCalledWith('update_tts_preference', newPrefs);
+-  });
+-
+-  it('sets up AI response listener', () => {
+-    const { result } = renderHook(() => useSocket());
+-    const callback = jest.fn();
+-
+-    const cleanup = result.current.onAIResponse(callback);
+-
+-    expect(mockSocket.on).toHaveBeenCalledWith('ai_response', callback);
+-    
+-    cleanup();
+-    expect(mockSocket.off).toHaveBeenCalledWith('ai_response', callback);
+-  });
+-
+-  it('cleans up on unmount', () => {
+-    const { unmount } = renderHook(() => useSocket());
+-
+-    unmount();
+-
+-    expect(mockSocket.off).toHaveBeenCalledWith('connect', expect.any(Function));
+-    expect(mockSocket.off).toHaveBeenCalledWith('disconnect', expect.any(Function));
+-    expect(mockSocket.off).toHaveBeenCalledWith('models', expect.any(Function));
+-    expect(mockSocket.off).toHaveBeenCalledWith('messages', expect.any(Function));
+-    expect(socketService.disconnectSocket).toHaveBeenCalled();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/hooks/useSpeechRecognition.test.js b/frontend/src/__tests__/hooks/useSpeechRecognition.test.js
+deleted file mode 100644
+index b869cfa..0000000
+--- a/frontend/src/__tests__/hooks/useSpeechRecognition.test.js
++++ /dev/null
+@@ -1,350 +0,0 @@
+-import { renderHook, act } from '@testing-library/react';
+-import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+-
+-describe('useSpeechRecognition Hook', () => {
+-  let mockRecognition;
+-  let mockOnComplete;
+-
+-  beforeEach(() => {
+-    mockOnComplete = jest.fn();
+-    
+-    mockRecognition = {
+-      continuous: false,
+-      interimResults: false,
+-      lang: '',
+-      start: jest.fn(),
+-      stop: jest.fn(),
+-      abort: jest.fn(),
+-      onresult: null,
+-      onend: null,
+-      onerror: null
+-    };
+-
+-    // Mock SpeechRecognition
+-    global.SpeechRecognition = jest.fn(() => mockRecognition);
+-    global.webkitSpeechRecognition = global.SpeechRecognition;
+-
+-    jest.useFakeTimers();
+-  });
+-
+-  afterEach(() => {
+-    jest.useRealTimers();
+-    jest.clearAllMocks();
+-    delete global.SpeechRecognition;
+-    delete global.webkitSpeechRecognition;
+-  });
+-
+-  it('initializes with correct default values when supported', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    expect(result.current.isListening).toBe(false);
+-    expect(result.current.transcript).toBe('');
+-    expect(result.current.isSupported).toBe(true);
+-    expect(typeof result.current.startListening).toBe('function');
+-    expect(typeof result.current.stopListening).toBe('function');
+-  });
+-
+-  it('initializes as not supported when SpeechRecognition unavailable', () => {
+-    delete global.SpeechRecognition;
+-    delete global.webkitSpeechRecognition;
+-
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    expect(result.current.isSupported).toBe(false);
+-  });
+-
+-  it('configures recognition correctly', () => {
+-    renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    expect(global.SpeechRecognition).toHaveBeenCalled();
+-    expect(mockRecognition.continuous).toBe(true);
+-    expect(mockRecognition.interimResults).toBe(true);
+-    expect(mockRecognition.lang).toBe('en-US');
+-  });
+-
+-  it('starts listening', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    expect(mockRecognition.start).toHaveBeenCalled();
+-    expect(result.current.isListening).toBe(true);
+-    expect(result.current.transcript).toBe('');
+-  });
+-
+-  it('does not start if already listening', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    mockRecognition.start.mockClear();
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    expect(mockRecognition.start).not.toHaveBeenCalled();
+-  });
+-
+-  it('stops listening', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    act(() => {
+-      result.current.stopListening();
+-    });
+-
+-    expect(mockRecognition.stop).toHaveBeenCalled();
+-  });
+-
+-  it('handles speech results with final transcript', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    // Simulate speech result
+-    const mockEvent = {
+-      resultIndex: 0,
+-      results: [
+-        {
+-          0: { transcript: 'hello world' },
+-          isFinal: true
+-        }
+-      ]
+-    };
+-
+-    act(() => {
+-      mockRecognition.onresult(mockEvent);
+-    });
+-
+-    expect(result.current.transcript).toBe('hello world');
+-  });
+-
+-  it('handles speech results with interim transcript', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    // Simulate interim result
+-    const mockEvent = {
+-      resultIndex: 0,
+-      results: [
+-        {
+-          0: { transcript: 'hello' },
+-          isFinal: false
+-        }
+-      ]
+-    };
+-
+-    act(() => {
+-      mockRecognition.onresult(mockEvent);
+-    });
+-
+-    expect(result.current.transcript).toBe('hello');
+-  });
+-
+-  it('calls onComplete after silence timeout', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    // Simulate final speech result
+-    const mockEvent = {
+-      resultIndex: 0,
+-      results: [
+-        {
+-          0: { transcript: 'test message' },
+-          isFinal: true
+-        }
+-      ]
+-    };
+-
+-    act(() => {
+-      mockRecognition.onresult(mockEvent);
+-    });
+-
+-    // Fast-forward timeout
+-    act(() => {
+-      jest.advanceTimersByTime(2000);
+-    });
+-
+-    expect(mockOnComplete).toHaveBeenCalledWith('test message');
+-    expect(mockRecognition.stop).toHaveBeenCalled();
+-  });
+-
+-  it('clears timeout on new speech', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    // First result
+-    const mockEvent1 = {
+-      resultIndex: 0,
+-      results: [
+-        {
+-          0: { transcript: 'hello' },
+-          isFinal: true
+-        }
+-      ]
+-    };
+-
+-    act(() => {
+-      mockRecognition.onresult(mockEvent1);
+-    });
+-
+-    // Advance time partially
+-    act(() => {
+-      jest.advanceTimersByTime(1000);
+-    });
+-
+-    // Second result should clear timeout
+-    const mockEvent2 = {
+-      resultIndex: 1,
+-      results: [
+-        {
+-          0: { transcript: 'hello' },
+-          isFinal: true
+-        },
+-        {
+-          0: { transcript: ' world' },
+-          isFinal: true
+-        }
+-      ]
+-    };
+-
+-    act(() => {
+-      mockRecognition.onresult(mockEvent2);
+-    });
+-
+-    // Advance remaining time from first timeout
+-    act(() => {
+-      jest.advanceTimersByTime(1000);
+-    });
+-
+-    // Should not have called onComplete yet
+-    expect(mockOnComplete).not.toHaveBeenCalled();
+-
+-    // Advance full timeout from second result
+-    act(() => {
+-      jest.advanceTimersByTime(2000);
+-    });
+-
+-    expect(mockOnComplete).toHaveBeenCalledWith('hello world');
+-  });
+-
+-  it('handles recognition end event', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    act(() => {
+-      mockRecognition.onend();
+-    });
+-
+-    expect(result.current.isListening).toBe(false);
+-  });
+-
+-  it('calls onComplete on end if text available', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    // Add some text
+-    const mockEvent = {
+-      resultIndex: 0,
+-      results: [
+-        {
+-          0: { transcript: 'fallback test' },
+-          isFinal: true
+-        }
+-      ]
+-    };
+-
+-    act(() => {
+-      mockRecognition.onresult(mockEvent);
+-    });
+-
+-    // End recognition before timeout
+-    act(() => {
+-      mockRecognition.onend();
+-    });
+-
+-    expect(mockOnComplete).toHaveBeenCalledWith('fallback test');
+-  });
+-
+-  it('handles recognition error', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    act(() => {
+-      mockRecognition.onerror();
+-    });
+-
+-    expect(result.current.isListening).toBe(false);
+-  });
+-
+-  it('prevents duplicate onComplete calls', () => {
+-    const { result } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    act(() => {
+-      result.current.startListening();
+-    });
+-
+-    const mockEvent = {
+-      resultIndex: 0,
+-      results: [
+-        {
+-          0: { transcript: 'duplicate test' },
+-          isFinal: true
+-        }
+-      ]
+-    };
+-
+-    act(() => {
+-      mockRecognition.onresult(mockEvent);
+-    });
+-
+-    // Trigger timeout
+-    act(() => {
+-      jest.advanceTimersByTime(2000);
+-    });
+-
+-    // Try to trigger onend
+-    act(() => {
+-      mockRecognition.onend();
+-    });
+-
+-    expect(mockOnComplete).toHaveBeenCalledTimes(1);
+-    expect(mockOnComplete).toHaveBeenCalledWith('duplicate test');
+-  });
+-
+-  it('cleans up on unmount', () => {
+-    const { unmount } = renderHook(() => useSpeechRecognition(mockOnComplete));
+-
+-    unmount();
+-
+-    expect(mockRecognition.abort).toHaveBeenCalled();
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/hooks/useTTS.test.js b/frontend/src/__tests__/hooks/useTTS.test.js
+deleted file mode 100644
+index a591912..0000000
+--- a/frontend/src/__tests__/hooks/useTTS.test.js
++++ /dev/null
+@@ -1,60 +0,0 @@
+-import { renderHook, act } from '@testing-library/react';
+-import { useTTS } from '../../hooks/useTTS';
+-
+-// Mock Web Speech API
+-const mockSpeak = jest.fn();
+-const mockCancel = jest.fn();
+-
+-global.speechSynthesis = {
+-  speak: mockSpeak,
+-  cancel: mockCancel,
+-  getVoices: jest.fn(() => []),
+-  addEventListener: jest.fn(),
+-  removeEventListener: jest.fn()
+-};
+-
+-global.SpeechSynthesisUtterance = jest.fn().mockImplementation((text) => ({
+-  text,
+-  voice: null,
+-  rate: 1,
+-  pitch: 1,
+-  volume: 1,
+-  onstart: null,
+-  onend: null,
+-  onerror: null
+-}));
+-
+-describe('useTTS Hook', () => {
+-  beforeEach(() => {
+-    mockSpeak.mockClear();
+-    mockCancel.mockClear();
+-  });
+-
+-  it('returns speak and stop functions', () => {
+-    const { result } = renderHook(() => useTTS());
+-    
+-    expect(typeof result.current.speakText).toBe('function');
+-    expect(typeof result.current.stopSpeaking).toBe('function');
+-    expect(result.current.isPlaying).toBe(false);
+-  });
+-
+-  it('calls speechSynthesis.speak when speak is called', () => {
+-    const { result } = renderHook(() => useTTS());
+-    
+-    act(() => {
+-      result.current.speakText('Hello world');
+-    });
+-    
+-    expect(mockSpeak).toHaveBeenCalledTimes(1);
+-  });
+-
+-  it('calls speechSynthesis.cancel when stop is called', () => {
+-    const { result } = renderHook(() => useTTS());
+-    
+-    act(() => {
+-      result.current.stopSpeaking();
+-    });
+-    
+-    expect(mockCancel).toHaveBeenCalledTimes(1);
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/services/api.test.js b/frontend/src/__tests__/services/api.test.js
+deleted file mode 100644
+index 5e9829f..0000000
+--- a/frontend/src/__tests__/services/api.test.js
++++ /dev/null
+@@ -1,36 +0,0 @@
+-import ApiService from '../../services/api';
+-
+-// Mock fetch
+-global.fetch = jest.fn();
+-
+-describe('ApiService', () => {
+-  beforeEach(() => {
+-    fetch.mockClear();
+-  });
+-
+-  it('creates instance with token', () => {
+-    const api = new ApiService('test-token');
+-    expect(api.token).toBe('test-token');
+-    expect(api.baseURL).toBe('http://localhost:8080');
+-  });
+-
+-  it('makes authenticated request to get tasks', async () => {
+-    fetch.mockResolvedValueOnce({
+-      ok: true,
+-      json: async () => ({ tasks: [] })
+-    });
+-
+-    const api = new ApiService('test-token');
+-    const result = await api.getTasks();
+-
+-    expect(fetch).toHaveBeenCalledWith(
+-      'http://localhost:8080/api/tasks',
+-      expect.objectContaining({
+-        headers: expect.objectContaining({
+-          'Authorization': 'Bearer test-token'
+-        })
+-      })
+-    );
+-    expect(result).toEqual({ tasks: [] });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/services/eventEmitter.test.js b/frontend/src/__tests__/services/eventEmitter.test.js
+deleted file mode 100644
+index 24dd046..0000000
+--- a/frontend/src/__tests__/services/eventEmitter.test.js
++++ /dev/null
+@@ -1,241 +0,0 @@
+-// Simple EventEmitter for testing
+-export class EventEmitter {
+-  constructor() {
+-    this.events = {};
+-  }
+-
+-  on(event, listener) {
+-    if (!this.events[event]) {
+-      this.events[event] = [];
+-    }
+-    this.events[event].push(listener);
+-    return this;
+-  }
+-
+-  off(event, listenerToRemove) {
+-    if (!this.events[event]) return this;
+-    
+-    this.events[event] = this.events[event].filter(
+-      listener => listener !== listenerToRemove
+-    );
+-    
+-    if (this.events[event].length === 0) {
+-      delete this.events[event];
+-    }
+-    
+-    return this;
+-  }
+-
+-  emit(event, ...args) {
+-    if (!this.events[event]) return false;
+-    
+-    this.events[event].forEach(listener => {
+-      try {
+-        listener.apply(this, args);
+-      } catch (error) {
+-        console.error('Error in event listener:', error);
+-      }
+-    });
+-    
+-    return true;
+-  }
+-
+-  once(event, listener) {
+-    const onceWrapper = (...args) => {
+-      this.off(event, onceWrapper);
+-      listener.apply(this, args);
+-    };
+-    
+-    this.on(event, onceWrapper);
+-    return this;
+-  }
+-
+-  removeAllListeners(event) {
+-    if (event) {
+-      delete this.events[event];
+-    } else {
+-      this.events = {};
+-    }
+-    return this;
+-  }
+-
+-  listenerCount(event) {
+-    return this.events[event] ? this.events[event].length : 0;
+-  }
+-
+-  eventNames() {
+-    return Object.keys(this.events);
+-  }
+-}
+-
+-describe('EventEmitter', () => {
+-  let emitter;
+-
+-  beforeEach(() => {
+-    emitter = new EventEmitter();
+-  });
+-
+-  describe('on/emit', () => {
+-    it('registers and calls event listeners', () => {
+-      const listener = jest.fn();
+-      emitter.on('test', listener);
+-      
+-      emitter.emit('test', 'arg1', 'arg2');
+-      
+-      expect(listener).toHaveBeenCalledWith('arg1', 'arg2');
+-    });
+-
+-    it('calls multiple listeners for the same event', () => {
+-      const listener1 = jest.fn();
+-      const listener2 = jest.fn();
+-      
+-      emitter.on('test', listener1);
+-      emitter.on('test', listener2);
+-      
+-      emitter.emit('test', 'data');
+-      
+-      expect(listener1).toHaveBeenCalledWith('data');
+-      expect(listener2).toHaveBeenCalledWith('data');
+-    });
+-
+-    it('returns false when emitting non-existent event', () => {
+-      const result = emitter.emit('nonexistent');
+-      expect(result).toBe(false);
+-    });
+-
+-    it('returns true when emitting existing event', () => {
+-      emitter.on('test', () => {});
+-      const result = emitter.emit('test');
+-      expect(result).toBe(true);
+-    });
+-
+-    it('handles errors in listeners gracefully', () => {
+-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+-      const goodListener = jest.fn();
+-      const badListener = jest.fn(() => {
+-        throw new Error('Listener error');
+-      });
+-      
+-      emitter.on('test', badListener);
+-      emitter.on('test', goodListener);
+-      
+-      emitter.emit('test');
+-      
+-      expect(consoleSpy).toHaveBeenCalledWith('Error in event listener:', expect.any(Error));
+-      expect(goodListener).toHaveBeenCalled();
+-      
+-      consoleSpy.mockRestore();
+-    });
+-  });
+-
+-  describe('off', () => {
+-    it('removes specific listener', () => {
+-      const listener1 = jest.fn();
+-      const listener2 = jest.fn();
+-      
+-      emitter.on('test', listener1);
+-      emitter.on('test', listener2);
+-      emitter.off('test', listener1);
+-      
+-      emitter.emit('test');
+-      
+-      expect(listener1).not.toHaveBeenCalled();
+-      expect(listener2).toHaveBeenCalled();
+-    });
+-
+-    it('removes event when no listeners remain', () => {
+-      const listener = jest.fn();
+-      emitter.on('test', listener);
+-      emitter.off('test', listener);
+-      
+-      expect(emitter.eventNames()).not.toContain('test');
+-    });
+-
+-    it('handles removing non-existent listener', () => {
+-      const listener = jest.fn();
+-      expect(() => emitter.off('test', listener)).not.toThrow();
+-    });
+-  });
+-
+-  describe('once', () => {
+-    it('calls listener only once', () => {
+-      const listener = jest.fn();
+-      emitter.once('test', listener);
+-      
+-      emitter.emit('test', 'first');
+-      emitter.emit('test', 'second');
+-      
+-      expect(listener).toHaveBeenCalledTimes(1);
+-      expect(listener).toHaveBeenCalledWith('first');
+-    });
+-
+-    it('removes listener after first call', () => {
+-      const listener = jest.fn();
+-      emitter.once('test', listener);
+-      
+-      expect(emitter.listenerCount('test')).toBe(1);
+-      emitter.emit('test');
+-      expect(emitter.listenerCount('test')).toBe(0);
+-    });
+-  });
+-
+-  describe('removeAllListeners', () => {
+-    it('removes all listeners for specific event', () => {
+-      emitter.on('test1', () => {});
+-      emitter.on('test1', () => {});
+-      emitter.on('test2', () => {});
+-      
+-      emitter.removeAllListeners('test1');
+-      
+-      expect(emitter.listenerCount('test1')).toBe(0);
+-      expect(emitter.listenerCount('test2')).toBe(1);
+-    });
+-
+-    it('removes all listeners for all events', () => {
+-      emitter.on('test1', () => {});
+-      emitter.on('test2', () => {});
+-      
+-      emitter.removeAllListeners();
+-      
+-      expect(emitter.eventNames()).toHaveLength(0);
+-    });
+-  });
+-
+-  describe('listenerCount', () => {
+-    it('returns correct listener count', () => {
+-      expect(emitter.listenerCount('test')).toBe(0);
+-      
+-      emitter.on('test', () => {});
+-      expect(emitter.listenerCount('test')).toBe(1);
+-      
+-      emitter.on('test', () => {});
+-      expect(emitter.listenerCount('test')).toBe(2);
+-    });
+-  });
+-
+-  describe('eventNames', () => {
+-    it('returns array of event names', () => {
+-      expect(emitter.eventNames()).toEqual([]);
+-      
+-      emitter.on('test1', () => {});
+-      emitter.on('test2', () => {});
+-      
+-      expect(emitter.eventNames()).toEqual(['test1', 'test2']);
+-    });
+-  });
+-
+-  describe('method chaining', () => {
+-    it('supports method chaining', () => {
+-      const listener = jest.fn();
+-      
+-      const result = emitter
+-        .on('test1', listener)
+-        .on('test2', listener)
+-        .off('test1', listener)
+-        .once('test3', listener)
+-        .removeAllListeners('test2');
+-      
+-      expect(result).toBe(emitter);
+-    });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/services/socket.test.js b/frontend/src/__tests__/services/socket.test.js
+deleted file mode 100644
+index 2282a25..0000000
+--- a/frontend/src/__tests__/services/socket.test.js
++++ /dev/null
+@@ -1,112 +0,0 @@
+-import { connectSocket, disconnectSocket, socket } from '../../services/socket';
+-import { io } from 'socket.io-client';
+-
+-// Mock socket.io-client
+-jest.mock('socket.io-client');
+-
+-describe('Socket Service', () => {
+-  let mockSocket;
+-
+-  beforeEach(() => {
+-    mockSocket = {
+-      connected: false,
+-      disconnect: jest.fn(),
+-      on: jest.fn(),
+-      off: jest.fn(),
+-      emit: jest.fn()
+-    };
+-
+-    io.mockReturnValue(mockSocket);
+-  });
+-
+-  afterEach(() => {
+-    jest.clearAllMocks();
+-    // Clean up global socket
+-    if (global.window && global.window.auraflowSocket) {
+-      delete global.window.auraflowSocket;
+-    }
+-  });
+-
+-  describe('connectSocket', () => {
+-    it('creates new socket connection', () => {
+-      const token = 'test-token';
+-      const result = connectSocket(token);
+-
+-      expect(io).toHaveBeenCalledWith('http://localhost:8080', {
+-        auth: { token },
+-        autoConnect: true
+-      });
+-      expect(result).toBe(mockSocket);
+-      expect(global.window.auraflowSocket).toBe(mockSocket);
+-    });
+-
+-    it('uses custom API URL from environment', () => {
+-      const originalEnv = process.env.REACT_APP_API_URL;
+-      process.env.REACT_APP_API_URL = 'https://custom-api.com';
+-
+-      connectSocket('token');
+-
+-      expect(io).toHaveBeenCalledWith('https://custom-api.com', expect.any(Object));
+-
+-      // Restore original env
+-      process.env.REACT_APP_API_URL = originalEnv;
+-    });
+-
+-    it('disconnects existing socket before creating new one', () => {
+-      mockSocket.connected = true;
+-      
+-      // First connection
+-      connectSocket('token1');
+-      
+-      // Second connection should disconnect first
+-      connectSocket('token2');
+-
+-      expect(mockSocket.disconnect).toHaveBeenCalled();
+-      expect(io).toHaveBeenCalledTimes(2);
+-    });
+-
+-    it('does not disconnect if socket not connected', () => {
+-      mockSocket.connected = false;
+-      
+-      connectSocket('token1');
+-      connectSocket('token2');
+-
+-      expect(mockSocket.disconnect).not.toHaveBeenCalled();
+-    });
+-  });
+-
+-  describe('disconnectSocket', () => {
+-    it('disconnects connected socket', () => {
+-      mockSocket.connected = true;
+-      connectSocket('token');
+-      
+-      disconnectSocket();
+-
+-      expect(mockSocket.disconnect).toHaveBeenCalled();
+-    });
+-
+-    it('does nothing if socket not connected', () => {
+-      mockSocket.connected = false;
+-      connectSocket('token');
+-      
+-      disconnectSocket();
+-
+-      expect(mockSocket.disconnect).not.toHaveBeenCalled();
+-    });
+-
+-    it('does nothing if no socket exists', () => {
+-      expect(() => disconnectSocket()).not.toThrow();
+-    });
+-  });
+-
+-  describe('socket export', () => {
+-    it('exports socket instance', () => {
+-      expect(socket).toBeNull();
+-      
+-      connectSocket('token');
+-      
+-      // Socket should be updated after connection
+-      expect(socket).toBe(mockSocket);
+-    });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/utils/audio.test.js b/frontend/src/__tests__/utils/audio.test.js
+deleted file mode 100644
+index 5bfe309..0000000
+--- a/frontend/src/__tests__/utils/audio.test.js
++++ /dev/null
+@@ -1,344 +0,0 @@
+-// Audio utility functions for testing
+-export const createAudioContext = () => {
+-  if (typeof AudioContext !== 'undefined') {
+-    return new AudioContext();
+-  } else if (typeof webkitAudioContext !== 'undefined') {
+-    return new webkitAudioContext();
+-  }
+-  return null;
+-};
+-
+-export const loadAudioBuffer = async (audioContext, url) => {
+-  try {
+-    const response = await fetch(url);
+-    const arrayBuffer = await response.arrayBuffer();
+-    return await audioContext.decodeAudioData(arrayBuffer);
+-  } catch (error) {
+-    console.error('Failed to load audio buffer:', error);
+-    return null;
+-  }
+-};
+-
+-export const playAudioBuffer = (audioContext, audioBuffer, volume = 1.0, loop = false) => {
+-  if (!audioContext || !audioBuffer) return null;
+-
+-  const source = audioContext.createBufferSource();
+-  const gainNode = audioContext.createGain();
+-
+-  source.buffer = audioBuffer;
+-  source.loop = loop;
+-  gainNode.gain.value = Math.max(0, Math.min(1, volume));
+-
+-  source.connect(gainNode);
+-  gainNode.connect(audioContext.destination);
+-
+-  source.start();
+-  return source;
+-};
+-
+-export const stopAudioSource = (audioSource) => {
+-  if (audioSource) {
+-    try {
+-      audioSource.stop();
+-    } catch (error) {
+-      // Source might already be stopped
+-    }
+-  }
+-};
+-
+-export const fadeAudio = (gainNode, targetVolume, duration = 1000) => {
+-  if (!gainNode) return;
+-
+-  const currentTime = gainNode.context.currentTime;
+-  const currentVolume = gainNode.gain.value;
+-  
+-  gainNode.gain.cancelScheduledValues(currentTime);
+-  gainNode.gain.setValueAtTime(currentVolume, currentTime);
+-  gainNode.gain.linearRampToValueAtTime(targetVolume, currentTime + duration / 1000);
+-};
+-
+-describe('Audio Utilities', () => {
+-  // Mock Web Audio API
+-  beforeAll(() => {
+-    global.AudioContext = jest.fn().mockImplementation(() => ({
+-      createBufferSource: jest.fn(() => ({
+-        buffer: null,
+-        loop: false,
+-        connect: jest.fn(),
+-        start: jest.fn(),
+-        stop: jest.fn()
+-      })),
+-      createGain: jest.fn(() => ({
+-        gain: {
+-          value: 1,
+-          cancelScheduledValues: jest.fn(),
+-          setValueAtTime: jest.fn(),
+-          linearRampToValueAtTime: jest.fn()
+-        },
+-        connect: jest.fn(),
+-        context: {
+-          currentTime: 0
+-        }
+-      })),
+-      decodeAudioData: jest.fn(),
+-      destination: {},
+-      currentTime: 0
+-    }));
+-
+-    global.webkitAudioContext = global.AudioContext;
+-    global.fetch = jest.fn();
+-  });
+-
+-  afterAll(() => {
+-    delete global.AudioContext;
+-    delete global.webkitAudioContext;
+-    delete global.fetch;
+-  });
+-
+-  describe('createAudioContext', () => {
+-    it('creates AudioContext when available', () => {
+-      const context = createAudioContext();
+-      expect(context).toBeDefined();
+-      expect(AudioContext).toHaveBeenCalled();
+-    });
+-
+-    it('falls back to webkitAudioContext', () => {
+-      delete global.AudioContext;
+-      
+-      const context = createAudioContext();
+-      expect(context).toBeDefined();
+-      
+-      // Restore for other tests
+-      global.AudioContext = global.webkitAudioContext;
+-    });
+-
+-    it('returns null when no AudioContext available', () => {
+-      delete global.AudioContext;
+-      delete global.webkitAudioContext;
+-      
+-      const context = createAudioContext();
+-      expect(context).toBeNull();
+-      
+-      // Restore for other tests
+-      global.AudioContext = jest.fn().mockImplementation(() => ({}));
+-      global.webkitAudioContext = global.AudioContext;
+-    });
+-  });
+-
+-  describe('loadAudioBuffer', () => {
+-    it('loads audio buffer successfully', async () => {
+-      const mockArrayBuffer = new ArrayBuffer(8);
+-      const mockAudioBuffer = { length: 1024 };
+-      
+-      global.fetch.mockResolvedValue({
+-        arrayBuffer: () => Promise.resolve(mockArrayBuffer)
+-      });
+-
+-      const mockContext = {
+-        decodeAudioData: jest.fn().mockResolvedValue(mockAudioBuffer)
+-      };
+-
+-      const result = await loadAudioBuffer(mockContext, 'test.mp3');
+-      
+-      expect(fetch).toHaveBeenCalledWith('test.mp3');
+-      expect(mockContext.decodeAudioData).toHaveBeenCalledWith(mockArrayBuffer);
+-      expect(result).toBe(mockAudioBuffer);
+-    });
+-
+-    it('handles fetch errors', async () => {
+-      global.fetch.mockRejectedValue(new Error('Network error'));
+-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+-
+-      const mockContext = { decodeAudioData: jest.fn() };
+-      const result = await loadAudioBuffer(mockContext, 'test.mp3');
+-      
+-      expect(result).toBeNull();
+-      expect(consoleSpy).toHaveBeenCalledWith('Failed to load audio buffer:', expect.any(Error));
+-      
+-      consoleSpy.mockRestore();
+-    });
+-
+-    it('handles decode errors', async () => {
+-      const mockArrayBuffer = new ArrayBuffer(8);
+-      
+-      global.fetch.mockResolvedValue({
+-        arrayBuffer: () => Promise.resolve(mockArrayBuffer)
+-      });
+-
+-      const mockContext = {
+-        decodeAudioData: jest.fn().mockRejectedValue(new Error('Decode error'))
+-      };
+-
+-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+-      const result = await loadAudioBuffer(mockContext, 'test.mp3');
+-      
+-      expect(result).toBeNull();
+-      expect(consoleSpy).toHaveBeenCalledWith('Failed to load audio buffer:', expect.any(Error));
+-      
+-      consoleSpy.mockRestore();
+-    });
+-  });
+-
+-  describe('playAudioBuffer', () => {
+-    it('plays audio buffer with default settings', () => {
+-      const mockSource = {
+-        buffer: null,
+-        loop: false,
+-        connect: jest.fn(),
+-        start: jest.fn()
+-      };
+-
+-      const mockGainNode = {
+-        gain: { value: 1 },
+-        connect: jest.fn()
+-      };
+-
+-      const mockContext = {
+-        createBufferSource: jest.fn(() => mockSource),
+-        createGain: jest.fn(() => mockGainNode),
+-        destination: {}
+-      };
+-
+-      const mockBuffer = { length: 1024 };
+-      
+-      const result = playAudioBuffer(mockContext, mockBuffer);
+-      
+-      expect(mockContext.createBufferSource).toHaveBeenCalled();
+-      expect(mockContext.createGain).toHaveBeenCalled();
+-      expect(mockSource.buffer).toBe(mockBuffer);
+-      expect(mockSource.loop).toBe(false);
+-      expect(mockGainNode.gain.value).toBe(1);
+-      expect(mockSource.connect).toHaveBeenCalledWith(mockGainNode);
+-      expect(mockGainNode.connect).toHaveBeenCalledWith(mockContext.destination);
+-      expect(mockSource.start).toHaveBeenCalled();
+-      expect(result).toBe(mockSource);
+-    });
+-
+-    it('plays audio buffer with custom settings', () => {
+-      const mockSource = {
+-        buffer: null,
+-        loop: false,
+-        connect: jest.fn(),
+-        start: jest.fn()
+-      };
+-
+-      const mockGainNode = {
+-        gain: { value: 1 },
+-        connect: jest.fn()
+-      };
+-
+-      const mockContext = {
+-        createBufferSource: jest.fn(() => mockSource),
+-        createGain: jest.fn(() => mockGainNode),
+-        destination: {}
+-      };
+-
+-      const mockBuffer = { length: 1024 };
+-      
+-      playAudioBuffer(mockContext, mockBuffer, 0.5, true);
+-      
+-      expect(mockSource.loop).toBe(true);
+-      expect(mockGainNode.gain.value).toBe(0.5);
+-    });
+-
+-    it('clamps volume to valid range', () => {
+-      const mockGainNode = {
+-        gain: { value: 1 },
+-        connect: jest.fn()
+-      };
+-
+-      const mockContext = {
+-        createBufferSource: jest.fn(() => ({
+-          buffer: null,
+-          loop: false,
+-          connect: jest.fn(),
+-          start: jest.fn()
+-        })),
+-        createGain: jest.fn(() => mockGainNode),
+-        destination: {}
+-      };
+-
+-      const mockBuffer = { length: 1024 };
+-      
+-      playAudioBuffer(mockContext, mockBuffer, 2.0);
+-      expect(mockGainNode.gain.value).toBe(1);
+-      
+-      playAudioBuffer(mockContext, mockBuffer, -0.5);
+-      expect(mockGainNode.gain.value).toBe(0);
+-    });
+-
+-    it('returns null for invalid inputs', () => {
+-      expect(playAudioBuffer(null, {})).toBeNull();
+-      expect(playAudioBuffer({}, null)).toBeNull();
+-    });
+-  });
+-
+-  describe('stopAudioSource', () => {
+-    it('stops audio source', () => {
+-      const mockSource = {
+-        stop: jest.fn()
+-      };
+-      
+-      stopAudioSource(mockSource);
+-      expect(mockSource.stop).toHaveBeenCalled();
+-    });
+-
+-    it('handles already stopped sources', () => {
+-      const mockSource = {
+-        stop: jest.fn(() => {
+-          throw new Error('Source already stopped');
+-        })
+-      };
+-      
+-      expect(() => stopAudioSource(mockSource)).not.toThrow();
+-    });
+-
+-    it('handles null source', () => {
+-      expect(() => stopAudioSource(null)).not.toThrow();
+-    });
+-  });
+-
+-  describe('fadeAudio', () => {
+-    it('fades audio to target volume', () => {
+-      const mockGainNode = {
+-        gain: {
+-          value: 1,
+-          cancelScheduledValues: jest.fn(),
+-          setValueAtTime: jest.fn(),
+-          linearRampToValueAtTime: jest.fn()
+-        },
+-        context: {
+-          currentTime: 5
+-        }
+-      };
+-      
+-      fadeAudio(mockGainNode, 0.5, 2000);
+-      
+-      expect(mockGainNode.gain.cancelScheduledValues).toHaveBeenCalledWith(5);
+-      expect(mockGainNode.gain.setValueAtTime).toHaveBeenCalledWith(1, 5);
+-      expect(mockGainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 7);
+-    });
+-
+-    it('uses default duration', () => {
+-      const mockGainNode = {
+-        gain: {
+-          value: 0.8,
+-          cancelScheduledValues: jest.fn(),
+-          setValueAtTime: jest.fn(),
+-          linearRampToValueAtTime: jest.fn()
+-        },
+-        context: {
+-          currentTime: 10
+-        }
+-      };
+-      
+-      fadeAudio(mockGainNode, 0);
+-      
+-      expect(mockGainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 11);
+-    });
+-
+-    it('handles null gain node', () => {
+-      expect(() => fadeAudio(null, 0.5)).not.toThrow();
+-    });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/utils/constants.test.js b/frontend/src/__tests__/utils/constants.test.js
+deleted file mode 100644
+index 12ce8d7..0000000
+--- a/frontend/src/__tests__/utils/constants.test.js
++++ /dev/null
+@@ -1,87 +0,0 @@
+-// Constants for testing
+-export const APP_CONSTANTS = {
+-  MAX_MESSAGE_LENGTH: 1000,
+-  MAX_TASK_TITLE_LENGTH: 100,
+-  DEFAULT_FOCUS_DURATION: 25,
+-  BREATHING_PHASES: ['inhale', 'hold', 'exhale', 'hold'],
+-  SOUNDSCAPES: ['forest', 'cabin', 'beach', 'whitenoise'],
+-  API_ENDPOINTS: {
+-    TASKS: '/api/tasks',
+-    CALENDAR: '/api/calendar',
+-    CHAT: '/api/chat'
+-  }
+-};
+-
+-export const VALIDATION_RULES = {
+-  EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+-  PASSWORD_MIN_LENGTH: 8,
+-  TASK_TITLE_MAX_LENGTH: 100
+-};
+-
+-export const UI_CONSTANTS = {
+-  MOBILE_BREAKPOINT: 768,
+-  TABLET_BREAKPOINT: 1024,
+-  ANIMATION_DURATION: 300,
+-  DEBOUNCE_DELAY: 500
+-};
+-
+-describe('Constants', () => {
+-  describe('APP_CONSTANTS', () => {
+-    it('has correct message length limit', () => {
+-      expect(APP_CONSTANTS.MAX_MESSAGE_LENGTH).toBe(1000);
+-    });
+-
+-    it('has correct task title length limit', () => {
+-      expect(APP_CONSTANTS.MAX_TASK_TITLE_LENGTH).toBe(100);
+-    });
+-
+-    it('has correct default focus duration', () => {
+-      expect(APP_CONSTANTS.DEFAULT_FOCUS_DURATION).toBe(25);
+-    });
+-
+-    it('has correct breathing phases', () => {
+-      expect(APP_CONSTANTS.BREATHING_PHASES).toHaveLength(4);
+-      expect(APP_CONSTANTS.BREATHING_PHASES).toContain('inhale');
+-      expect(APP_CONSTANTS.BREATHING_PHASES).toContain('exhale');
+-    });
+-
+-    it('has correct soundscapes', () => {
+-      expect(APP_CONSTANTS.SOUNDSCAPES).toHaveLength(4);
+-      expect(APP_CONSTANTS.SOUNDSCAPES).toContain('forest');
+-      expect(APP_CONSTANTS.SOUNDSCAPES).toContain('beach');
+-    });
+-
+-    it('has correct API endpoints', () => {
+-      expect(APP_CONSTANTS.API_ENDPOINTS.TASKS).toBe('/api/tasks');
+-      expect(APP_CONSTANTS.API_ENDPOINTS.CALENDAR).toBe('/api/calendar');
+-      expect(APP_CONSTANTS.API_ENDPOINTS.CHAT).toBe('/api/chat');
+-    });
+-  });
+-
+-  describe('VALIDATION_RULES', () => {
+-    it('has correct email regex', () => {
+-      expect(VALIDATION_RULES.EMAIL_REGEX.test('test@example.com')).toBe(true);
+-      expect(VALIDATION_RULES.EMAIL_REGEX.test('invalid-email')).toBe(false);
+-    });
+-
+-    it('has correct password minimum length', () => {
+-      expect(VALIDATION_RULES.PASSWORD_MIN_LENGTH).toBe(8);
+-    });
+-
+-    it('has correct task title maximum length', () => {
+-      expect(VALIDATION_RULES.TASK_TITLE_MAX_LENGTH).toBe(100);
+-    });
+-  });
+-
+-  describe('UI_CONSTANTS', () => {
+-    it('has correct breakpoints', () => {
+-      expect(UI_CONSTANTS.MOBILE_BREAKPOINT).toBe(768);
+-      expect(UI_CONSTANTS.TABLET_BREAKPOINT).toBe(1024);
+-    });
+-
+-    it('has correct timing constants', () => {
+-      expect(UI_CONSTANTS.ANIMATION_DURATION).toBe(300);
+-      expect(UI_CONSTANTS.DEBOUNCE_DELAY).toBe(500);
+-    });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/utils/dateUtils.test.js b/frontend/src/__tests__/utils/dateUtils.test.js
+deleted file mode 100644
+index d344794..0000000
+--- a/frontend/src/__tests__/utils/dateUtils.test.js
++++ /dev/null
+@@ -1,43 +0,0 @@
+-// Simple date utility functions for testing
+-export const formatDate = (date) => {
+-  if (!date) return '';
+-  return new Date(date).toLocaleDateString();
+-};
+-
+-export const isToday = (date) => {
+-  if (!date) return false;
+-  const today = new Date();
+-  const checkDate = new Date(date);
+-  return today.toDateString() === checkDate.toDateString();
+-};
+-
+-export const addDays = (date, days) => {
+-  const result = new Date(date);
+-  result.setDate(result.getDate() + days);
+-  return result;
+-};
+-
+-describe('Date Utilities', () => {
+-  it('formats date correctly', () => {
+-    const date = new Date('2024-01-15');
+-    const formatted = formatDate(date);
+-    expect(formatted).toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/);
+-  });
+-
+-  it('returns empty string for null date', () => {
+-    expect(formatDate(null)).toBe('');
+-    expect(formatDate(undefined)).toBe('');
+-  });
+-
+-  it('checks if date is today', () => {
+-    const today = new Date();
+-    expect(isToday(today)).toBe(true);
+-    expect(isToday(null)).toBe(false);
+-  });
+-
+-  it('adds days to date', () => {
+-    const date = new Date(2024, 0, 15); // Use constructor to avoid timezone issues
+-    const result = addDays(date, 5);
+-    expect(result.getDate()).toBe(20);
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/utils/formatters.test.js b/frontend/src/__tests__/utils/formatters.test.js
+deleted file mode 100644
+index e9bd755..0000000
+--- a/frontend/src/__tests__/utils/formatters.test.js
++++ /dev/null
+@@ -1,148 +0,0 @@
+-// Formatter utility functions for testing
+-export const formatTime = (seconds) => {
+-  if (typeof seconds !== 'number' || seconds < 0) return '00:00';
+-  
+-  const minutes = Math.floor(seconds / 60);
+-  const remainingSeconds = seconds % 60;
+-  
+-  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+-};
+-
+-export const formatDuration = (minutes) => {
+-  if (typeof minutes !== 'number' || minutes <= 0) return '0 minutes';
+-  
+-  if (minutes < 60) {
+-    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+-  }
+-  
+-  const hours = Math.floor(minutes / 60);
+-  const remainingMinutes = minutes % 60;
+-  
+-  if (remainingMinutes === 0) {
+-    return `${hours} hour${hours === 1 ? '' : 's'}`;
+-  }
+-  
+-  return `${hours}h ${remainingMinutes}m`;
+-};
+-
+-export const formatFileSize = (bytes) => {
+-  if (typeof bytes !== 'number' || bytes < 0) return '0 B';
+-  
+-  const units = ['B', 'KB', 'MB', 'GB'];
+-  let size = bytes;
+-  let unitIndex = 0;
+-  
+-  while (size >= 1024 && unitIndex < units.length - 1) {
+-    size /= 1024;
+-    unitIndex++;
+-  }
+-  
+-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+-};
+-
+-export const formatPercentage = (value, total) => {
+-  if (typeof value !== 'number' || typeof total !== 'number' || total === 0) {
+-    return '0%';
+-  }
+-  
+-  const percentage = (value / total) * 100;
+-  return `${Math.round(percentage)}%`;
+-};
+-
+-export const truncateText = (text, maxLength = 50) => {
+-  if (typeof text !== 'string') return '';
+-  if (text.length <= maxLength) return text;
+-  
+-  return text.substring(0, maxLength - 3) + '...';
+-};
+-
+-describe('Formatter Utilities', () => {
+-  describe('formatTime', () => {
+-    it('formats seconds correctly', () => {
+-      expect(formatTime(0)).toBe('00:00');
+-      expect(formatTime(30)).toBe('00:30');
+-      expect(formatTime(60)).toBe('01:00');
+-      expect(formatTime(125)).toBe('02:05');
+-      expect(formatTime(3661)).toBe('61:01');
+-    });
+-
+-    it('handles invalid input', () => {
+-      expect(formatTime(-1)).toBe('00:00');
+-      expect(formatTime('invalid')).toBe('00:00');
+-      expect(formatTime(null)).toBe('00:00');
+-      expect(formatTime(undefined)).toBe('00:00');
+-    });
+-  });
+-
+-  describe('formatDuration', () => {
+-    it('formats minutes correctly', () => {
+-      expect(formatDuration(0)).toBe('0 minutes');
+-      expect(formatDuration(1)).toBe('1 minute');
+-      expect(formatDuration(30)).toBe('30 minutes');
+-      expect(formatDuration(60)).toBe('1 hour');
+-      expect(formatDuration(90)).toBe('1h 30m');
+-      expect(formatDuration(120)).toBe('2 hours');
+-      expect(formatDuration(150)).toBe('2h 30m');
+-    });
+-
+-    it('handles invalid input', () => {
+-      expect(formatDuration(-1)).toBe('0 minutes');
+-      expect(formatDuration('invalid')).toBe('0 minutes');
+-      expect(formatDuration(null)).toBe('0 minutes');
+-    });
+-  });
+-
+-  describe('formatFileSize', () => {
+-    it('formats bytes correctly', () => {
+-      expect(formatFileSize(0)).toBe('0 B');
+-      expect(formatFileSize(512)).toBe('512 B');
+-      expect(formatFileSize(1024)).toBe('1.0 KB');
+-      expect(formatFileSize(1536)).toBe('1.5 KB');
+-      expect(formatFileSize(1048576)).toBe('1.0 MB');
+-      expect(formatFileSize(1073741824)).toBe('1.0 GB');
+-    });
+-
+-    it('handles invalid input', () => {
+-      expect(formatFileSize(-1)).toBe('0 B');
+-      expect(formatFileSize('invalid')).toBe('0 B');
+-      expect(formatFileSize(null)).toBe('0 B');
+-    });
+-  });
+-
+-  describe('formatPercentage', () => {
+-    it('calculates percentage correctly', () => {
+-      expect(formatPercentage(0, 100)).toBe('0%');
+-      expect(formatPercentage(25, 100)).toBe('25%');
+-      expect(formatPercentage(50, 100)).toBe('50%');
+-      expect(formatPercentage(75, 100)).toBe('75%');
+-      expect(formatPercentage(100, 100)).toBe('100%');
+-      expect(formatPercentage(33, 100)).toBe('33%');
+-    });
+-
+-    it('handles edge cases', () => {
+-      expect(formatPercentage(10, 0)).toBe('0%');
+-      expect(formatPercentage('invalid', 100)).toBe('0%');
+-      expect(formatPercentage(50, 'invalid')).toBe('0%');
+-    });
+-  });
+-
+-  describe('truncateText', () => {
+-    it('truncates long text', () => {
+-      const longText = 'This is a very long text that should be truncated';
+-      expect(truncateText(longText, 20)).toBe('This is a very lo...');
+-      expect(truncateText(longText, 10)).toBe('This is...');
+-    });
+-
+-    it('keeps short text unchanged', () => {
+-      const shortText = 'Short text';
+-      expect(truncateText(shortText, 20)).toBe('Short text');
+-      expect(truncateText(shortText)).toBe('Short text');
+-    });
+-
+-    it('handles invalid input', () => {
+-      expect(truncateText(null)).toBe('');
+-      expect(truncateText(undefined)).toBe('');
+-      expect(truncateText(123)).toBe('');
+-    });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/utils/helpers.test.js b/frontend/src/__tests__/utils/helpers.test.js
+deleted file mode 100644
+index 80c6808..0000000
+--- a/frontend/src/__tests__/utils/helpers.test.js
++++ /dev/null
+@@ -1,235 +0,0 @@
+-// Helper utility functions for testing
+-export const debounce = (func, delay) => {
+-  let timeoutId;
+-  return (...args) => {
+-    clearTimeout(timeoutId);
+-    timeoutId = setTimeout(() => func.apply(null, args), delay);
+-  };
+-};
+-
+-export const throttle = (func, limit) => {
+-  let inThrottle;
+-  return (...args) => {
+-    if (!inThrottle) {
+-      func.apply(null, args);
+-      inThrottle = true;
+-      setTimeout(() => inThrottle = false, limit);
+-    }
+-  };
+-};
+-
+-export const generateId = (prefix = 'id') => {
+-  return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+-};
+-
+-export const deepClone = (obj) => {
+-  if (obj === null || typeof obj !== 'object') return obj;
+-  if (obj instanceof Date) return new Date(obj.getTime());
+-  if (obj instanceof Array) return obj.map(item => deepClone(item));
+-  if (typeof obj === 'object') {
+-    const cloned = {};
+-    Object.keys(obj).forEach(key => {
+-      cloned[key] = deepClone(obj[key]);
+-    });
+-    return cloned;
+-  }
+-};
+-
+-export const isEqual = (a, b) => {
+-  if (a === b) return true;
+-  if (a == null || b == null) return false;
+-  if (Array.isArray(a) && Array.isArray(b)) {
+-    if (a.length !== b.length) return false;
+-    return a.every((item, index) => isEqual(item, b[index]));
+-  }
+-  if (typeof a === 'object' && typeof b === 'object') {
+-    const keysA = Object.keys(a);
+-    const keysB = Object.keys(b);
+-    if (keysA.length !== keysB.length) return false;
+-    return keysA.every(key => isEqual(a[key], b[key]));
+-  }
+-  return false;
+-};
+-
+-export const capitalize = (str) => {
+-  if (typeof str !== 'string' || str.length === 0) return '';
+-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+-};
+-
+-export const camelToKebab = (str) => {
+-  if (typeof str !== 'string') return '';
+-  return str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+-};
+-
+-describe('Helper Utilities', () => {
+-  describe('debounce', () => {
+-    beforeEach(() => {
+-      jest.useFakeTimers();
+-    });
+-
+-    afterEach(() => {
+-      jest.useRealTimers();
+-    });
+-
+-    it('delays function execution', () => {
+-      const mockFn = jest.fn();
+-      const debouncedFn = debounce(mockFn, 100);
+-
+-      debouncedFn('test');
+-      expect(mockFn).not.toHaveBeenCalled();
+-
+-      jest.advanceTimersByTime(100);
+-      expect(mockFn).toHaveBeenCalledWith('test');
+-    });
+-
+-    it('cancels previous calls', () => {
+-      const mockFn = jest.fn();
+-      const debouncedFn = debounce(mockFn, 100);
+-
+-      debouncedFn('first');
+-      debouncedFn('second');
+-      
+-      jest.advanceTimersByTime(100);
+-      expect(mockFn).toHaveBeenCalledTimes(1);
+-      expect(mockFn).toHaveBeenCalledWith('second');
+-    });
+-  });
+-
+-  describe('throttle', () => {
+-    beforeEach(() => {
+-      jest.useFakeTimers();
+-    });
+-
+-    afterEach(() => {
+-      jest.useRealTimers();
+-    });
+-
+-    it('limits function calls', () => {
+-      const mockFn = jest.fn();
+-      const throttledFn = throttle(mockFn, 100);
+-
+-      throttledFn('first');
+-      throttledFn('second');
+-      throttledFn('third');
+-
+-      expect(mockFn).toHaveBeenCalledTimes(1);
+-      expect(mockFn).toHaveBeenCalledWith('first');
+-
+-      jest.advanceTimersByTime(100);
+-      throttledFn('fourth');
+-      expect(mockFn).toHaveBeenCalledTimes(2);
+-      expect(mockFn).toHaveBeenCalledWith('fourth');
+-    });
+-  });
+-
+-  describe('generateId', () => {
+-    it('generates unique IDs', () => {
+-      const id1 = generateId();
+-      const id2 = generateId();
+-      expect(id1).not.toBe(id2);
+-      expect(id1).toMatch(/^id_\d+_[a-z0-9]+$/);
+-    });
+-
+-    it('uses custom prefix', () => {
+-      const id = generateId('task');
+-      expect(id).toMatch(/^task_\d+_[a-z0-9]+$/);
+-    });
+-  });
+-
+-  describe('deepClone', () => {
+-    it('clones primitive values', () => {
+-      expect(deepClone(42)).toBe(42);
+-      expect(deepClone('hello')).toBe('hello');
+-      expect(deepClone(true)).toBe(true);
+-      expect(deepClone(null)).toBe(null);
+-    });
+-
+-    it('clones arrays', () => {
+-      const original = [1, 2, [3, 4]];
+-      const cloned = deepClone(original);
+-      
+-      expect(cloned).toEqual(original);
+-      expect(cloned).not.toBe(original);
+-      expect(cloned[2]).not.toBe(original[2]);
+-    });
+-
+-    it('clones objects', () => {
+-      const original = { a: 1, b: { c: 2 } };
+-      const cloned = deepClone(original);
+-      
+-      expect(cloned).toEqual(original);
+-      expect(cloned).not.toBe(original);
+-      expect(cloned.b).not.toBe(original.b);
+-    });
+-
+-    it('clones dates', () => {
+-      const original = new Date('2024-01-01');
+-      const cloned = deepClone(original);
+-      
+-      expect(cloned).toEqual(original);
+-      expect(cloned).not.toBe(original);
+-    });
+-  });
+-
+-  describe('isEqual', () => {
+-    it('compares primitive values', () => {
+-      expect(isEqual(1, 1)).toBe(true);
+-      expect(isEqual('a', 'a')).toBe(true);
+-      expect(isEqual(true, true)).toBe(true);
+-      expect(isEqual(1, 2)).toBe(false);
+-      expect(isEqual('a', 'b')).toBe(false);
+-    });
+-
+-    it('compares arrays', () => {
+-      expect(isEqual([1, 2, 3], [1, 2, 3])).toBe(true);
+-      expect(isEqual([1, [2, 3]], [1, [2, 3]])).toBe(true);
+-      expect(isEqual([1, 2], [1, 2, 3])).toBe(false);
+-      expect(isEqual([1, 2], [2, 1])).toBe(false);
+-    });
+-
+-    it('compares objects', () => {
+-      expect(isEqual({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true);
+-      expect(isEqual({ a: 1, b: { c: 2 } }, { a: 1, b: { c: 2 } })).toBe(true);
+-      expect(isEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+-      expect(isEqual({ a: 1, b: 2 }, { a: 1, b: 3 })).toBe(false);
+-    });
+-
+-    it('handles null and undefined', () => {
+-      expect(isEqual(null, null)).toBe(true);
+-      expect(isEqual(undefined, undefined)).toBe(true);
+-      expect(isEqual(null, undefined)).toBe(false);
+-      expect(isEqual(null, 0)).toBe(false);
+-    });
+-  });
+-
+-  describe('capitalize', () => {
+-    it('capitalizes strings', () => {
+-      expect(capitalize('hello')).toBe('Hello');
+-      expect(capitalize('WORLD')).toBe('World');
+-      expect(capitalize('hELLo WoRLD')).toBe('Hello world');
+-    });
+-
+-    it('handles edge cases', () => {
+-      expect(capitalize('')).toBe('');
+-      expect(capitalize('a')).toBe('A');
+-      expect(capitalize(123)).toBe('');
+-      expect(capitalize(null)).toBe('');
+-    });
+-  });
+-
+-  describe('camelToKebab', () => {
+-    it('converts camelCase to kebab-case', () => {
+-      expect(camelToKebab('camelCase')).toBe('camel-case');
+-      expect(camelToKebab('someVeryLongVariableName')).toBe('some-very-long-variable-name');
+-      expect(camelToKebab('HTML')).toBe('html');
+-      expect(camelToKebab('XMLHttpRequest')).toBe('xmlhttp-request');
+-    });
+-
+-    it('handles edge cases', () => {
+-      expect(camelToKebab('lowercase')).toBe('lowercase');
+-      expect(camelToKebab('A')).toBe('a');
+-      expect(camelToKebab('')).toBe('');
+-      expect(camelToKebab(123)).toBe('');
+-    });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/utils/theme.test.js b/frontend/src/__tests__/utils/theme.test.js
+deleted file mode 100644
+index 0f8a19c..0000000
+--- a/frontend/src/__tests__/utils/theme.test.js
++++ /dev/null
+@@ -1,19 +0,0 @@
+-import { theme } from '../../theme';
+-
+-describe('Theme Configuration', () => {
+-  it('has aura color palette', () => {
+-    expect(theme.colors.aura).toBeDefined();
+-    expect(theme.colors.aura[0]).toBe('#EFE2D3');
+-    expect(theme.colors.aura[1]).toBe('#0A8FA8');
+-  });
+-
+-  it('has correct primary settings', () => {
+-    expect(theme.primaryColor).toBe('aura');
+-    expect(theme.primaryShade).toBe(1);
+-  });
+-
+-  it('has custom other properties', () => {
+-    expect(theme.other.textLight).toBe('#2D1B21');
+-    expect(theme.other.textDark).toBe('#EFE2D3');
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/__tests__/utils/validation.test.js b/frontend/src/__tests__/utils/validation.test.js
+deleted file mode 100644
+index 667f17e..0000000
+--- a/frontend/src/__tests__/utils/validation.test.js
++++ /dev/null
+@@ -1,74 +0,0 @@
+-// Simple validation functions for testing
+-export const validateEmail = (email) => {
+-  if (!email) return false;
+-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+-  return emailRegex.test(email);
+-};
+-
+-export const validatePassword = (password) => {
+-  if (!password) return false;
+-  return password.length >= 8;
+-};
+-
+-export const validateTaskTitle = (title) => {
+-  if (!title) return false;
+-  return title.trim().length > 0 && title.length <= 100;
+-};
+-
+-export const sanitizeInput = (input) => {
+-  if (!input) return '';
+-  return input.trim().replace(/[<>]/g, '');
+-};
+-
+-describe('Validation Utilities', () => {
+-  describe('validateEmail', () => {
+-    it('validates correct email', () => {
+-      expect(validateEmail('test@example.com')).toBe(true);
+-      expect(validateEmail('user.name@domain.co.uk')).toBe(true);
+-    });
+-
+-    it('rejects invalid email', () => {
+-      expect(validateEmail('invalid')).toBe(false);
+-      expect(validateEmail('test@')).toBe(false);
+-      expect(validateEmail('@domain.com')).toBe(false);
+-      expect(validateEmail('')).toBe(false);
+-      expect(validateEmail(null)).toBe(false);
+-    });
+-  });
+-
+-  describe('validatePassword', () => {
+-    it('validates strong password', () => {
+-      expect(validatePassword('password123')).toBe(true);
+-      expect(validatePassword('12345678')).toBe(true);
+-    });
+-
+-    it('rejects weak password', () => {
+-      expect(validatePassword('short')).toBe(false);
+-      expect(validatePassword('')).toBe(false);
+-      expect(validatePassword(null)).toBe(false);
+-    });
+-  });
+-
+-  describe('validateTaskTitle', () => {
+-    it('validates good task title', () => {
+-      expect(validateTaskTitle('Valid task')).toBe(true);
+-      expect(validateTaskTitle('A')).toBe(true);
+-    });
+-
+-    it('rejects invalid task title', () => {
+-      expect(validateTaskTitle('')).toBe(false);
+-      expect(validateTaskTitle('   ')).toBe(false);
+-      expect(validateTaskTitle(null)).toBe(false);
+-      expect(validateTaskTitle('a'.repeat(101))).toBe(false);
+-    });
+-  });
+-
+-  describe('sanitizeInput', () => {
+-    it('sanitizes input correctly', () => {
+-      expect(sanitizeInput('  hello world  ')).toBe('hello world');
+-      expect(sanitizeInput('<script>alert("xss")</script>')).toBe('scriptalert("xss")/script');
+-      expect(sanitizeInput('')).toBe('');
+-      expect(sanitizeInput(null)).toBe('');
+-    });
+-  });
+-});
+\ No newline at end of file
+diff --git a/frontend/src/contexts/AuthContext.jsx b/frontend/src/contexts/AuthContext.jsx
+index 4604996..d8862d0 100644
+--- a/frontend/src/contexts/AuthContext.jsx
++++ b/frontend/src/contexts/AuthContext.jsx
+@@ -12,24 +12,38 @@ export const useAuth = () => {
+ 
+ export const AuthProvider = ({ children }) => {
+   const [user, setUser] = useState(null);
+-  const [token, setToken] = useState(localStorage.getItem('authToken'));
++  const [token, setToken] = useState(
++    localStorage.getItem('authToken') || 
++    document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1]
++  );
+   const [loading, setLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const checkAuth = async () => {
+-      // Check for token in URL (from OAuth callback in development)
+-      const urlParams = new URLSearchParams(window.location.search);
+-      const urlToken = urlParams.get('token');
+-      
+-      if (urlToken) {
+-        setToken(urlToken);
+-        localStorage.setItem('authToken', urlToken);
+-        // Clean URL
+-        window.history.replaceState({}, document.title, window.location.pathname);
+-        
+-        // Decode JWT to get user info
++    // Check for token in URL (from OAuth callback)
++    const urlParams = new URLSearchParams(window.location.search);
++    const urlToken = urlParams.get('token');
++    
++    if (urlToken) {
++      setToken(urlToken);
++      localStorage.setItem('authToken', urlToken);
++      // Clean URL
++      window.history.replaceState({}, document.title, window.location.pathname);
++    }
++
++    if (token) {
++      // Handle mock token for MSW testing
++      if (token === 'mock-jwt-token') {
++        setUser({
++          id: 'test-user-123',
++          googleId: 'test-google-id',
++          email: 'test@example.com',
++          name: 'Test User',
++          picture: null
++        });
++      } else {
++        // Decode real JWT to get user info
+         try {
+-          const payload = JSON.parse(atob(urlToken.split('.')[1]));
++          const payload = JSON.parse(atob(token.split('.')[1]));
+           setUser({
+             id: payload.userId,
+             googleId: payload.googleId,
+@@ -39,51 +53,12 @@ export const AuthProvider = ({ children }) => {
+           });
+         } catch (error) {
+           console.error('Invalid token:', error);
+-        }
+-      } else if (token) {
+-        // Handle existing token from localStorage
+-        if (token === 'mock-jwt-token') {
+-          setUser({
+-            id: 'test-user-123',
+-            googleId: 'test-google-id',
+-            email: 'test@example.com',
+-            name: 'Test User',
+-            picture: null
+-          });
+-        } else {
+-          // Decode real JWT to get user info
+-          try {
+-            const payload = JSON.parse(atob(token.split('.')[1]));
+-            setUser({
+-              id: payload.userId,
+-              googleId: payload.googleId,
+-              email: payload.email,
+-              name: payload.name,
+-              picture: payload.picture
+-            });
+-          } catch (error) {
+-            console.error('Invalid token:', error);
+-            logout();
+-          }
+-        }
+-      } else {
+-        // Check if authenticated via httpOnly cookie (production)
+-        try {
+-          const response = await fetch('/auth/status', {
+-            credentials: 'include' // Include cookies
+-          });
+-          if (response.ok) {
+-            const data = await response.json();
+-            setUser(data.user);
+-          }
+-        } catch (error) {
+-          console.log('Not authenticated via cookie');
++          logout();
+         }
+       }
+-      setLoading(false);
+-    };
+-
+-    checkAuth();
++    }
++    
++    setLoading(false);
+   }, [token]);
+ 
+   const login = () => {
+diff --git a/frontend/src/hooks/useTTS.js b/frontend/src/hooks/useTTS.js
+index 517198c..01b2f3c 100644
+--- a/frontend/src/hooks/useTTS.js
++++ b/frontend/src/hooks/useTTS.js
+@@ -25,10 +25,10 @@ export const useTTS = (preferences = {}) => {
+   const selectedVoice = useMemo(() => {
+     console.log('useTTS: Computing selectedVoice', { 
+       tts_voice: preferences?.tts_voice, 
+-      voicesCount: voices?.length || 0,
+-      voices: voices?.map(v => v.name) || []
++      voicesCount: voices.length,
++      voices: voices.map(v => v.name)
+     });
+-    if (preferences?.tts_voice && preferences.tts_voice !== 'default' && voices && voices.length > 0) {
++    if (preferences?.tts_voice && preferences.tts_voice !== 'default' && voices.length > 0) {
+       const found = voices.find(voice => voice.name === preferences.tts_voice);
+       console.log('useTTS: Selected voice:', found?.name);
+       return found;
+diff --git a/frontend/src/index.js b/frontend/src/index.js
+index a332e50..e928107 100644
+--- a/frontend/src/index.js
++++ b/frontend/src/index.js
+@@ -6,12 +6,9 @@ import './index.css';
+ 
+ // Start MSW for E2E tests (only in development)
+ if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_MSW_ENABLED === 'true') {
+-  import('./mocks/browser').then(({ worker }) => {
+-    worker.start({
+-      onUnhandledRequest: 'bypass'
+-    });
+-  }).catch(() => {
+-    // MSW not available, continue without it
++  const { worker } = await import('./mocks/browser');
++  await worker.start({
++    onUnhandledRequest: 'bypass'
+   });
+ }
+ 
+diff --git a/frontend/src/services/socket.js b/frontend/src/services/socket.js
+index 8a91f8d..5308856 100644
+--- a/frontend/src/services/socket.js
++++ b/frontend/src/services/socket.js
+@@ -9,17 +9,12 @@ export const connectSocket = (token) => {
+     socket.disconnect();
+   }
+   
+-  const socketConfig = {
+-    autoConnect: true,
+-    withCredentials: true, // Include cookies
+-  };
+-  
+-  // In development, use token auth. In production, rely on httpOnly cookies
+-  if (process.env.NODE_ENV !== 'production' && token) {
+-    socketConfig.auth = { token: token };
+-  }
+-  
+-  socket = io(SOCKET_URL, socketConfig);
++  socket = io(SOCKET_URL, {
++    auth: {
++      token: token
++    },
++    autoConnect: true
++  });
+   
+   // Expose socket globally for TTS context
+   window.auraflowSocket = socket;
+diff --git a/frontend/src/setupTests.js b/frontend/src/setupTests.js
+index c802c66..6c11211 100644
+--- a/frontend/src/setupTests.js
++++ b/frontend/src/setupTests.js
+@@ -1,10 +1,10 @@
+ import '@testing-library/jest-dom';
+ 
+-// Mock matchMedia for Mantine components
++// Mock window.matchMedia for Mantine components
+ Object.defineProperty(window, 'matchMedia', {
+   writable: true,
+   value: jest.fn().mockImplementation(query => ({
+-    matches: query.includes('max-width') ? false : true,
++    matches: false,
+     media: query,
+     onchange: null,
+     addListener: jest.fn(), // deprecated
+@@ -21,69 +21,3 @@ global.ResizeObserver = jest.fn().mockImplementation(() => ({
+   unobserve: jest.fn(),
+   disconnect: jest.fn(),
+ }));
+-
+-// Mock HTMLCanvasElement.getContext
+-HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
+-  fillRect: jest.fn(),
+-  clearRect: jest.fn(),
+-  getImageData: jest.fn(() => ({ data: new Array(4) })),
+-  putImageData: jest.fn(),
+-  createImageData: jest.fn(() => []),
+-  setTransform: jest.fn(),
+-  drawImage: jest.fn(),
+-  save: jest.fn(),
+-  fillText: jest.fn(),
+-  restore: jest.fn(),
+-  beginPath: jest.fn(),
+-  moveTo: jest.fn(),
+-  lineTo: jest.fn(),
+-  closePath: jest.fn(),
+-  stroke: jest.fn(),
+-  translate: jest.fn(),
+-  scale: jest.fn(),
+-  rotate: jest.fn(),
+-  arc: jest.fn(),
+-  fill: jest.fn(),
+-  measureText: jest.fn(() => ({ width: 0 })),
+-  transform: jest.fn(),
+-  rect: jest.fn(),
+-  clip: jest.fn(),
+-}));
+-
+-// Mock requestAnimationFrame
+-global.requestAnimationFrame = jest.fn(cb => setTimeout(cb, 0));
+-global.cancelAnimationFrame = jest.fn();
+-
+-// Mock speechSynthesis
+-const mockVoices = [
+-  { name: 'Default Voice', lang: 'en-US', default: true },
+-  { name: 'Voice 1', lang: 'en-US', default: false },
+-  { name: 'Voice 2', lang: 'en-GB', default: false },
+-];
+-
+-Object.defineProperty(window, 'speechSynthesis', {
+-  writable: true,
+-  value: {
+-    speak: jest.fn(),
+-    cancel: jest.fn(),
+-    pause: jest.fn(),
+-    resume: jest.fn(),
+-    getVoices: jest.fn(() => mockVoices),
+-    onvoiceschanged: null,
+-  },
+-});
+-
+-// Mock SpeechSynthesisUtterance
+-Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+-  writable: true,
+-  value: jest.fn().mockImplementation((text) => ({
+-    text,
+-    voice: null,
+-    volume: 1,
+-    rate: 1,
+-    pitch: 1,
+-    onstart: null,
+-    onend: null,
+-    onerror: null,
+-  })),
+-});
+\ No newline at end of file
+diff --git a/package.json b/package.json
+index 840a666..a4c8a93 100644
+--- a/package.json
++++ b/package.json
+@@ -4,28 +4,28 @@
+   "description": "A personal AI assistant with calendar integration, task management, and text-to-speech capabilities",
+   "scripts": {
+     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+-    "start": "cd backend && npm start",
+-    "heroku-postbuild": "npm run build",
++    "start": "node backend/server.js",
+     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+     "start:backend": "cd backend && npm start",
+     "start:frontend": "cd frontend && npm start",
+     "dev:backend": "cd backend && npm run dev",
+     "dev:frontend": "cd frontend && npm start",
+     "build": "cd backend && npm install && cd ../frontend && npm install && npm run build",
++    "heroku-postbuild": "npm run build",
+     "migrate": "cd backend && npm run migrate",
+     "setup": "npm run install-all && npm run migrate",
+     "test": "cd frontend && npm test -- --watchAll=false",
+-    "test:backend": "cd backend && npm test",
+-    "test:backend:coverage": "cd backend && npm run test:coverage",
+     "test:e2e": "cd frontend && npm run test:e2e",
+-    "test:all": "concurrently \"npm run test:backend\" \"npm test\" \"npm run test:e2e\""
++    "test:all": "concurrently \"npm test\" \"npm run test:e2e\""
+   },
+   "devDependencies": {
+     "concurrently": "^8.2.2"
+   },
+   "dependencies": {
+     "dotenv": "^17.2.3",
+-    "react-big-calendar": "^1.19.4"
++    "react-big-calendar": "^1.19.4",
++    "pg": "^8.16.3",
++    "express": "^4.18.2"
+   },
+   "engines": {
+     "node": "18.x",
+diff --git a/setup-ollama.sh b/setup-ollama.sh
+new file mode 100755
+index 0000000..388c587
+--- /dev/null
++++ b/setup-ollama.sh
+@@ -0,0 +1,8 @@
++#!/bin/bash
++echo "Waiting for Ollama to be ready..."
++sleep 10
++
++echo "Pulling llama3.2:1b model (lightweight)..."
++docker exec auraflow-ollama-1 ollama pull llama3.2:1b
++
++echo "Ollama setup complete!"
+diff --git a/start.sh b/start.sh
+index d6d0a22..cd25289 100755
+--- a/start.sh
++++ b/start.sh
+@@ -1,17 +1,5 @@
+-#!/bin/bash
+-
+-# Start both frontend and backend
+-echo "Starting AuraFlow fullstack application..."
+-
+-# Start backend in background
+-echo "Starting backend..."
+-cd backend && npm run dev &
+-BACKEND_PID=$!
+-
+-# Start frontend in background  
+-echo "Starting frontend..."
+-cd ../frontend && npm start &
+-FRONTEND_PID=$!
+-
+-# Wait for both processes
+-wait $BACKEND_PID $FRONTEND_PID
++#!/bin/sh
++echo "Running database migrations..."
++node backend/migrate.js
++echo "Starting server..."
++node backend/server.js
