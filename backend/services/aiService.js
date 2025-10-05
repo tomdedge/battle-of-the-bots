@@ -68,7 +68,6 @@ class AIService {
         this.defaultModel = chatModel ? chatModel.id : result.data[0].id;
         console.log('⚠️  Fallback model selected:', this.defaultModel, '(may not support tools)');
       }
-      }
     }
     
     return result;
