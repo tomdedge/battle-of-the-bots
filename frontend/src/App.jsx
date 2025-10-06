@@ -207,6 +207,8 @@ function MainApp() {
         onCancel={handleCancelMindfulness}
         onDismissToday={handleDismissToday}
       />
+      
+      <InstallPrompt />
     </AppShell>
   );
 }
