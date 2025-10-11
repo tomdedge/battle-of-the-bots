@@ -29,7 +29,7 @@ export const GoogleSignIn = () => {
         </Box>
         <Text size="lg" fw={500}>Welcome to AuraFlow</Text>
         <Text size="sm" c="dimmed" ta="center">
-          Sign in with Google to access your calendar and tasks
+          Sign in with Google to access<br />your calendar and tasks
         </Text>
         <Button
           onClick={login}
@@ -57,7 +57,7 @@ export const GoogleSignIn = () => {
           Sign in with Google
         </Button>
         <Text size="xs" ta="center" c="dimmed">
-          By signing in, you agree to our{' '}
+          By signing in, you agree to our<br />
           <Anchor href="/terms-of-service" target="_blank">
             Terms of Service
           </Anchor>

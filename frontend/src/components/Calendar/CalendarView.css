@@ -98,7 +98,7 @@
 
 .rbc-month-row {
   flex: 1;
-  min-height: 0;
+  min-height: 120px;
 }
 /* Fix DatePicker navigation */
 .mantine-DatePicker-calendarHeader {

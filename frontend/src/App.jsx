@@ -1,33 +1,33 @@
-import { useState, useEffect } from 'react';
-import { MantineProvider, ColorSchemeScript, AppShell } from '@mantine/core';
-import { useLocalStorage } from '@mantine/hooks';
-import { theme } from './theme';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { TTSProvider } from './contexts/TTSContext';
-import { ProtectedRoute } from './components/Auth/ProtectedRoute';
-import { Header } from './components/Navigation/Header';
-import { BottomTabs } from './components/Navigation/BottomTabs';
-import { ChatInterface } from './components/Chat/ChatInterface';
-import { CalendarView } from './components/Calendar/CalendarView';
-import { TasksView } from './components/Tasks/TasksView';
-import { MeditationPlaceholder } from './components/Meditation/MeditationPlaceholder';
-import { MindfulnessSuggestionModal } from './components/Calendar/MindfulnessSuggestionModal';
-import ApiService from './services/api';
-import { InstallPrompt } from './components/InstallPrompt';
-import '@mantine/core/styles.css';
-import '@mantine/dates/styles.css';
+import { useState, useEffect } from "react";
+import { MantineProvider, ColorSchemeScript, AppShell } from "@mantine/core";
+import { useLocalStorage } from "@mantine/hooks";
+import { theme } from "./theme";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { TTSProvider } from "./contexts/TTSContext";
+import { ProtectedRoute } from "./components/Auth/ProtectedRoute";
+import { Header } from "./components/Navigation/Header";
+import { BottomTabs } from "./components/Navigation/BottomTabs";
+import { ChatInterface } from "./components/Chat/ChatInterface";
+import { CalendarView } from "./components/Calendar/CalendarView";
+import { TasksView } from "./components/Tasks/TasksView";
+import { MeditationPlaceholder } from "./components/Meditation/MeditationPlaceholder";
+import { MindfulnessSuggestionModal } from "./components/Calendar/MindfulnessSuggestionModal";
+import ApiService from "./services/api";
+import { InstallPrompt } from "./components/InstallPrompt";
+import "@mantine/core/styles.css";
+import "@mantine/dates/styles.css";
 
 function MainApp() {
   // Initialize activeTab from localStorage or default to 'chat'
   const [activeTab, setActiveTab] = useState(() => {
-    const savedTab = localStorage.getItem('activeTab');
-    const validTabs = ['chat', 'calendar', 'tasks', 'meditation'];
-    return savedTab && validTabs.includes(savedTab) ? savedTab : 'chat';
+    const savedTab = localStorage.getItem("activeTab");
+    const validTabs = ["chat", "calendar", "tasks", "meditation"];
+    return savedTab && validTabs.includes(savedTab) ? savedTab : "chat";
   });
-  
+
   const [colorScheme, setColorScheme] = useLocalStorage({
-    key: 'mantine-color-scheme',
-    defaultValue: 'light',
+    key: "mantine-color-scheme",
+    defaultValue: "light",
     getInitialValueInEffect: true,
   });
   const [showMindfulnessModal, setShowMindfulnessModal] = useState(false);
@@ -36,7 +36,7 @@ function MainApp() {
 
   // Save activeTab to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('activeTab', activeTab);
+    localStorage.setItem("activeTab", activeTab);
   }, [activeTab]);
 
   useEffect(() => {
@@ -48,9 +48,9 @@ function MainApp() {
   const checkMindfulnessScheduled = async () => {
     try {
       // Check if user was already prompted today
-      const lastPrompt = localStorage.getItem('mindfulness_last_prompt');
+      const lastPrompt = localStorage.getItem("mindfulness_last_prompt");
       const today = new Date().toDateString();
-      
+
       if (lastPrompt === today) {
         return; // Already prompted today
       }
@@ -67,10 +67,11 @@ function MainApp() {
       );
 
       // Check if any mindfulness/meditation events exist today
-      const hasMindfulness = events.some(event => 
-        event.summary?.toLowerCase().includes('mindfulness') ||
-        event.summary?.toLowerCase().includes('meditation') ||
-        event.summary?.toLowerCase().includes('breathing')
+      const hasMindfulness = events.some(
+        (event) =>
+          event.summary?.toLowerCase().includes("mindfulness") ||
+          event.summary?.toLowerCase().includes("meditation") ||
+          event.summary?.toLowerCase().includes("breathing")
       );
 
       if (!hasMindfulness) {
@@ -80,7 +81,7 @@ function MainApp() {
         setShowMindfulnessModal(true);
       }
     } catch (error) {
-      console.error('Failed to check mindfulness schedule:', error);
+      console.error("Failed to check mindfulness schedule:", error);
     }
   };
 
@@ -97,7 +98,7 @@ function MainApp() {
     }
 
     // Simple check - if there's a conflict, move to next hour
-    const hasConflict = events.some(event => {
+    const hasConflict = events.some((event) => {
       const eventStart = new Date(event.start.dateTime || event.start.date);
       const eventEnd = new Date(event.end.dateTime || event.end.date);
       return suggested >= eventStart && suggested < eventEnd;
@@ -113,7 +114,7 @@ function MainApp() {
   const handleScheduleMindfulness = async (time) => {
     try {
       if (!time) {
-        console.error('No time provided for mindfulness scheduling');
+        console.error("No time provided for mindfulness scheduling");
         return;
       }
 
@@ -122,24 +123,27 @@ function MainApp() {
       const endTime = new Date(startTime.getTime() + 10 * 60 * 1000); // 10 minutes
 
       await api.createFocusBlock({
-        summary: 'Mindfulness Break',
-        description: 'Take a few minutes for mindful breathing and reflection',
+        summary: "Mindfulness Break",
+        description: "Take a few minutes for mindful breathing and reflection",
         start: { dateTime: startTime.toISOString() },
         end: { dateTime: endTime.toISOString() },
-        colorId: '2' // Green color
+        colorId: "2", // Green color
       });
 
       // Mark as prompted today
-      localStorage.setItem('mindfulness_last_prompt', new Date().toDateString());
+      localStorage.setItem(
+        "mindfulness_last_prompt",
+        new Date().toDateString()
+      );
     } catch (error) {
-      console.error('Failed to schedule mindfulness:', error);
+      console.error("Failed to schedule mindfulness:", error);
     }
   };
 
   const handleCancelMindfulness = () => {
     // Don't prompt again for 1 hour
     const nextPrompt = new Date(Date.now() + 60 * 60 * 1000);
-    localStorage.setItem('mindfulness_next_prompt', nextPrompt.toISOString());
+    localStorage.setItem("mindfulness_next_prompt", nextPrompt.toISOString());
   };
 
   const handleDismissToday = () => {
@@ -147,19 +151,19 @@ function MainApp() {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(6, 0, 0, 0);
-    localStorage.setItem('mindfulness_last_prompt', new Date().toDateString());
-    localStorage.setItem('mindfulness_next_prompt', tomorrow.toISOString());
+    localStorage.setItem("mindfulness_last_prompt", new Date().toDateString());
+    localStorage.setItem("mindfulness_next_prompt", tomorrow.toISOString());
   };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'chat':
+      case "chat":
         return <ChatInterface />;
-      case 'calendar':
+      case "calendar":
         return <CalendarView />;
-      case 'tasks':
+      case "tasks":
         return <TasksView />;
-      case 'meditation':
+      case "meditation":
         return <MeditationPlaceholder />;
       default:
         return <ChatInterface />;
@@ -171,32 +175,42 @@ function MainApp() {
       header={{ height: 60 }}
       padding={0}
       style={{
-        background: colorScheme === 'dark' ? theme.other.backgroundDark : theme.other.backgroundLight,
-        minHeight: '100vh'
+        background:
+          colorScheme === "dark"
+            ? theme.other.backgroundDark
+            : theme.other.backgroundLight,
+        minHeight: "100vh",
       }}
     >
       <AppShell.Header>
-        <Header />
+        <Header
+          onTitleClick={() => setActiveTab("chat")}
+          activeTab={activeTab}
+        />
       </AppShell.Header>
-      
-      <AppShell.Main style={{ 
-        height: 'calc(100vh - 60px)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        <div style={{ 
-          flex: 1, 
-          display: 'flex', 
-          flexDirection: 'column',
-          paddingBottom: '60px',
-          overflow: 'hidden',
-          minHeight: 0
-        }}>
+
+      <AppShell.Main
+        style={{
+          height: "calc(100vh - 60px)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            paddingBottom: "60px",
+            overflow: "hidden",
+            minHeight: 0,
+          }}
+        >
           {renderContent()}
         </div>
       </AppShell.Main>
-      
+
       <BottomTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <MindfulnessSuggestionModal
@@ -207,7 +221,7 @@ function MainApp() {
         onCancel={handleCancelMindfulness}
         onDismissToday={handleDismissToday}
       />
-      
+
       <InstallPrompt />
     </AppShell>
   );
